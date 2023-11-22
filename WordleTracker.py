@@ -68,7 +68,6 @@ def main():
                             self.text_channel = secondField['text_channel']
                             print(f'{get_log_time()}> Got text channel id of {self.text_channel}')
                         else:
-                            print(f'{get_log_time()}> Loading data for {firstField}')
                             load_player = self.Player(firstField)
                             load_player.winCount = secondField['winCount']
                             load_player.guesses = secondField['guesses']
@@ -77,11 +76,11 @@ def main():
                             load_player.succeededToday = secondField['succeededToday']
                             self.players.append(load_player)
                             print(f'{get_log_time()}> Loaded player {load_player.name} - '
-                                  f'win count: {load_player.winCount} '
-                                  f'guesses today: {load_player.guesses} '
-                                  f'registered: {load_player.registered} '
-                                  f'completed today: {load_player.completedToday} '
-                                  f'succeeded today: {load_player.succeededToday}')
+                                  f'wins: {load_player.winCount}, '
+                                  f'guesses: {load_player.guesses}, '
+                                  f'registered: {load_player.registered}, '
+                                  f'completed: {load_player.completedToday}, '
+                                  f'succeeded: {load_player.succeededToday}')
                     print(f'{get_log_time()}> Successfully loaded {self.FILENAME}')
 
         def write_json_file(self):
@@ -232,12 +231,18 @@ def main():
                 await message.channel.send(f'{player.name}, you have already submitted your results today.')
                 return
 
+            # set channel
+            client.text_channel = int(message.channel.id)
+            client.write_json_file()
+
             # process player's results
             await client.process(message, player)
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
     async def register_command(interaction):
         '''Command to register a player'''
+        client.text_channel = int(interaction.channel.id)
+        client.write_json_file()
         response = ''
         playerFound = False
         for player in client.players:
@@ -263,6 +268,8 @@ def main():
     @client.tree.command(name='deregister', description='Deregister from Wordle tracking. Use twice to delete saved data.')
     async def deregister_command(interaction):
         '''Command to deregister a player'''
+        client.text_channel = int(interaction.channel.id)
+        client.write_json_file()
         players_copy = client.players.copy()
         response = ''
         playerFound = False
@@ -286,19 +293,18 @@ def main():
 
     @tasks.loop(seconds=1)
     async def midnight_call():
-        '''Midnight call loop task that is run every second with an almost midnight check.'''
+        '''Midnight call loop task that is run every second with a midnight check.'''
+        if not client.players:
+            return
 
-        hours, minutes = get_time()
-        if client.scored_today and hours == 23 and minutes == 31:
+        hour, minute = get_time()
+        if client.scored_today and hour == 0 and minute == 1:
             client.scored_today = False
-        if hours != 23 or minutes != 30 or client.scored_today:
+        if hour != 0 or minute != 0 or client.scored_today:
             return
         client.scored_today = True
 
-        print(f'{get_log_time()}> It is almost midnight, sending daily scoreboard and then mentioning registered players')
-
-        if not client.players:
-            return
+        print(f'{get_log_time()}> It is midnight, sending daily scoreboard and then mentioning registered players')
         
         channel = client.get_channel(int(client.text_channel))
         shamed = ''
