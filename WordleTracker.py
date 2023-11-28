@@ -2,10 +2,11 @@
 
 import os
 import json
+import random
 import discord
 import datetime
 from dotenv import load_dotenv
-from discord import app_commands, Interaction, Intents, Client
+from discord import app_commands, Intents, Client
 from discord.ext import tasks
 
 load_dotenv()
@@ -54,6 +55,7 @@ def main():
             super(WordleTrackerClient, self).__init__(intents=intents)
             self.tree = app_commands.CommandTree(self)
             self.text_channel = 0
+            self.random_letter_starting = False
             self.scored_today = False
             self.players = []
 
@@ -67,6 +69,9 @@ def main():
                         if firstField == 'text_channel':
                             self.text_channel = secondField['text_channel']
                             print(f'{get_log_time()}> Got text channel id of {self.text_channel}')
+                        elif firstField == 'random_letter':
+                            self.random_letter_starting = secondField['random_letter']
+                            print(f'{get_log_time()}> Got random letter starting value of {self.random_letter_starting}')
                         else:
                             load_player = self.Player(firstField)
                             load_player.winCount = secondField['winCount']
@@ -87,6 +92,7 @@ def main():
             '''Writes player information from the players list to the json file'''
             data = {}
             data['text_channel'] = {'text_channel': self.text_channel}
+            data['random_letter'] = {'random_letter': self.random_letter_starting}
             for player in self.players:
                 data[player.name] = {'winCount': player.winCount,
                                      'guesses': player.guesses,
@@ -291,6 +297,14 @@ def main():
         await interaction.response.send_message(response)
 
 
+    @client.tree.command(name='randomletterstart', description='State a random letter to start the Wordle guessing with. Won\'t repeat a letter from within the last 5 days.')
+    async def randomletter_command(interaction):
+        '''Command to enable random letter starts'''
+        client.text_channel = int(interaction.channel.id)
+        client.random_letter_starting = not client.random_letter_starting
+        client.write_json_file()
+
+
     @tasks.loop(seconds=1)
     async def midnight_call():
         '''Midnight call loop task that is run every second with a midnight check.'''
@@ -334,6 +348,8 @@ def main():
             else:
                 print(f'{get_log_time()}> Failed to mention user {player.name}')
         await channel.send(f'{everyone}\nIt\'s time to do the Wordle!\nhttps://www.nytimes.com/games/wordle/index.html')
+        if client.random_letter_starting:
+            await channel.send(f'__**Your first word must start with the letter "{chr(random.randint(ord("A"), ord("Z")))}"**__')
 
     client.run(discord_token)
 
