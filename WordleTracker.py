@@ -297,7 +297,7 @@ def main():
         await interaction.response.send_message(response)
 
 
-    @client.tree.command(name='randomletterstart', description='State a random letter to start the Wordle guessing with. Won\'t repeat a letter from within the last 5 days.')
+    @client.tree.command(name='randomletterstart', description='State a random letter to start the Wordle guessing with.')
     async def randomletter_command(interaction):
         '''Command to enable random letter starts'''
         client.text_channel = int(interaction.channel.id)
@@ -349,7 +349,10 @@ def main():
                 print(f'{get_log_time()}> Failed to mention user {player.name}')
         await channel.send(f'{everyone}\nIt\'s time to do the Wordle!\nhttps://www.nytimes.com/games/wordle/index.html')
         if client.random_letter_starting:
-            await channel.send(f'__**Your first word must start with the letter "{chr(random.randint(ord("A"), ord("Z")))}"**__')
+            letter = chr(random.randint(ord("A"), ord("Z")))
+            while letter == 'X':
+                letter = chr(random.randint(ord("A"), ord("Z")))
+            await channel.send(f'__**Your first word must start with the letter "{letter}"**__')
 
     client.run(discord_token)
 
