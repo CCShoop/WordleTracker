@@ -298,11 +298,13 @@ def main():
 
 
     @client.tree.command(name='randomletterstart', description='State a random letter to start the Wordle guessing with.')
-    async def randomletter_command(interaction):
+    async def randomletterstart_command(interaction):
         '''Command to enable random letter starts'''
         client.text_channel = int(interaction.channel.id)
         client.random_letter_starting = not client.random_letter_starting
         client.write_json_file()
+        print(f'{get_log_time()}> Random letter starting toggled to {client.random_letter_starting}')
+        await interaction.response.send_message(f'Random letter starting has been toggled to {client.random_letter_starting}.')
 
 
     @tasks.loop(seconds=1)
