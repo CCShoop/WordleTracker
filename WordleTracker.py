@@ -50,6 +50,7 @@ def main():
                 self.registered = True
                 self.completedToday = False
                 self.succeededToday = False
+                self.attachments = []
 
         def __init__(self, intents):
             super(WordleTrackerClient, self).__init__(intents=intents)
@@ -111,17 +112,11 @@ def main():
 
             parseSuccess = message.content.splitlines()[-1].strip()
             player.succeededToday = parseSuccess == '🟩🟩🟩🟩🟩'
-
-            print(f'{get_log_time()}> Player {player.name} - guesses: {player.guesses}, succeded: {player.succeededToday}')
+            print(f'{get_log_time()}> Player {player.name} - guesses: {player.guesses}, succeeded: {player.succeededToday}')
 
             player.completedToday = True
-
-            if player.succeededToday:
-                await message.add_reaction('👍')
-            else:
-                await message.add_reaction('👎')
-
             client.write_json_file()
+            message.delete()
 
             allPlayersGuessed = True
             for player in client.players:
@@ -132,6 +127,11 @@ def main():
                 for line in client.tally_scores():
                     scoreboard += line
                 await message.channel.send(scoreboard)
+                for player in client.players:
+                    await message.channel.send(f'__{player.name}:__')
+                    for attachment in player.attachments:
+                        await message.channel.send(file=attachment)
+                    player.attachments.clear()
 
         def tally_scores(self):
             '''Sorts players and returns a list of strings to send as Discord messages'''
@@ -243,6 +243,11 @@ def main():
 
             # process player's results
             await client.process(message, player)
+        elif message.attachments:
+            for player in client.players:
+                if message.author.name == player.name:
+                    player.attachments.append(message.attachments)
+                    message.delete()
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
     async def register_command(interaction):
@@ -337,6 +342,11 @@ def main():
             for line in client.tally_scores():
                 scoreboard += line
             await channel.send(scoreboard)
+            for player in client.players:
+                await channel.send(f'__{player.name}:__')
+                for attachment in player.attachments:
+                    await channel.send(file=attachment)
+                player.attachments.clear()
 
         everyone = ''
         for player in client.players:
@@ -354,7 +364,7 @@ def main():
             letter = chr(random.randint(ord("A"), ord("Z")))
             while letter == 'X':
                 letter = chr(random.randint(ord("A"), ord("Z")))
-            await channel.send(f'__**Your first word must start with the letter "{letter}"**__')
+            await channel.send(f'__**Your first word must start with the letter "{letter}!"**__')
 
     client.run(discord_token)
 
