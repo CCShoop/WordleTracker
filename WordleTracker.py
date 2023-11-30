@@ -116,7 +116,7 @@ def main():
 
             player.completedToday = True
             client.write_json_file()
-            message.delete()
+            await message.delete()
 
             allPlayersGuessed = True
             for player in client.players:
@@ -211,8 +211,8 @@ def main():
     @client.event
     async def on_message(message):
         '''Client on_message event'''
-        # message is from this bot
-        if message.author == client.user:
+        # message is from this bot or not in dedicated text channel
+        if message.author == client.user or message.channel.id != client.text_channel:
             return
 
         if 'Wordle' in message.content and '/' in message.content and ('⬛' in message.content or '🟨' in message.content or '🟩' in message.content):
@@ -247,7 +247,7 @@ def main():
             for player in client.players:
                 if message.author.name == player.name:
                     player.attachments.append(message.attachments)
-                    message.delete()
+                    await message.delete()
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
     async def register_command(interaction):
