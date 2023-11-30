@@ -116,6 +116,10 @@ def main():
 
             player.completedToday = True
             client.write_json_file()
+            if player.succeededToday:
+                await message.channel.send(f'{message.author.name} guessed the word in {player.guesses} guesses.')
+            else:
+                await message.channel.send(f'{message.author.name} did not guess the word.')
             await message.delete()
 
             allPlayersGuessed = True
@@ -146,14 +150,18 @@ def main():
             results.append('WORDLING COMPLETE!\n\n**SCOREBOARD:**\n')
 
             # sort the players
-            self.players.sort(key=get_guesses)
-            if self.players[0].succeededToday:
+            wordle_players = []
+            for player in self.players:
+                if player.registered:
+                    wordle_players.append(player)
+            wordle_players.sort(key=get_guesses)
+            if wordle_players[0].succeededToday:
                 # if the player(s) with the lowest score successfully
                 # guessed the game, they are the first winner
-                first_winner = self.players[0]
+                first_winner = wordle_players[0]
                 winners.append(first_winner)
                 # for the rest of the players, check if they're tied
-                for player_it in self.players[1:]:
+                for player_it in wordle_players[1:]:
                     if player_it.guesses == first_winner.guesses:
                         winners.append(player_it)
                     else:
@@ -161,7 +169,7 @@ def main():
 
             place_counter = 1
             prev_guesses = 0
-            for player in self.players:
+            for player in wordle_players:
                 if not player.registered:
                     continue
                 print(f'{get_log_time()}> {place_counter}. {player.name} ({player.winCount} wins) with {player.guesses} guesses')
@@ -219,6 +227,7 @@ def main():
             # no registered players
             if not client.players:
                 await message.channel.send(f'{message.author.mention}, there are no registered players! Please register and resend your results to be the first.')
+                await message.delete()
                 return
             # find player in memory
             player: client.Player
@@ -230,11 +239,13 @@ def main():
             # player is not registered
             if not foundPlayer:
                 await message.channel.send(f'{message.author.name}, you are not registered! Please register and resend your results.')
+                await message.delete()
                 return
             # player has already sent results
             if player.completedToday:
                 print(f'{get_log_time()}> {player.name} tried to resubmit results')
                 await message.channel.send(f'{player.name}, you have already submitted your results today.')
+                await message.delete()
                 return
 
             # set channel
@@ -243,10 +254,12 @@ def main():
 
             # process player's results
             await client.process(message, player)
-        elif message.attachments:
+        elif message.attachments and message.content == '':
             for player in client.players:
                 if message.author.name == player.name:
-                    player.attachments.append(message.attachments)
+                    for attachment in message.attachments:
+                        player.attachments.append(attachment)
+                    await message.channel.send(f'Received image from {message.author.name}.')
                     await message.delete()
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
@@ -364,7 +377,7 @@ def main():
             letter = chr(random.randint(ord("A"), ord("Z")))
             while letter == 'X':
                 letter = chr(random.randint(ord("A"), ord("Z")))
-            await channel.send(f'__**Your first word must start with the letter "{letter}!"**__')
+            await channel.send(f'__**Your first word must start with the letter "{letter}"**__')
 
     client.run(discord_token)
 
