@@ -50,7 +50,7 @@ def main():
                 self.registered = True
                 self.completedToday = False
                 self.succeededToday = False
-                self.attachments = []
+                self.attachments = discord.Attachment
 
         def __init__(self, intents):
             super(WordleTrackerClient, self).__init__(intents=intents)
@@ -133,8 +133,7 @@ def main():
                 await message.channel.send(scoreboard)
                 for player in client.players:
                     await message.channel.send(f'__{player.name}:__')
-                    for attachment in player.attachments:
-                        await message.channel.send(file=attachment)
+                    await message.channel.send(player.attachment)
                     player.attachments.clear()
 
         def tally_scores(self):
@@ -212,12 +211,16 @@ def main():
     @client.event
     async def on_ready():
         client.read_json_file()
+        checkScored = True
+        for player in client.players:
+            checkScored = checkScored and player.completedToday
+        client.scored_today = checkScored
         if not midnight_call.is_running():
             midnight_call.start()
         print(f'{get_log_time()}> {client.user} has connected to Discord!')
 
     @client.event
-    async def on_message(message):
+    async def on_message(message: discord.Message):
         '''Client on_message event'''
         # message is from this bot or not in dedicated text channel
         if message.author == client.user or message.channel.id != client.text_channel:
@@ -254,11 +257,13 @@ def main():
 
             # process player's results
             await client.process(message, player)
-        elif message.attachments and message.content == '':
+        elif not client.scored_today and message.attachments and message.content == '':
             for player in client.players:
-                if message.author.name == player.name:
-                    for attachment in message.attachments:
-                        player.attachments.append(attachment)
+                if message.author.name == player.name and not player.attachments:
+                    if len(message.attachments) == 1:
+                        player.attachment = message.attachments
+                    else:
+                        player.attachment = message.attachments[0]
                     await message.channel.send(f'Received image from {message.author.name}.')
                     await message.delete()
 
@@ -336,7 +341,6 @@ def main():
             client.scored_today = False
         if hour != 0 or minute != 0 or client.scored_today:
             return
-        client.scored_today = True
 
         print(f'{get_log_time()}> It is midnight, sending daily scoreboard and then mentioning registered players')
         
@@ -351,15 +355,16 @@ def main():
                     print(f'{get_log_time()}> Failed to mention user {player.name}')
         if shamed != '':
             await channel.send(f'SHAME ON {shamed} FOR NOT DOING THE WORDLE!')
+        if not client.scored_today:
             scoreboard = ''
             for line in client.tally_scores():
                 scoreboard += line
             await channel.send(scoreboard)
             for player in client.players:
                 await channel.send(f'__{player.name}:__')
-                for attachment in player.attachments:
-                    await channel.send(file=attachment)
+                await channel.send(player.attachment)
                 player.attachments.clear()
+        client.scored_today = True
 
         everyone = ''
         for player in client.players:
