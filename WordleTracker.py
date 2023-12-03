@@ -133,8 +133,13 @@ def main():
                     scoreboard += line
                 await message.channel.send(scoreboard)
                 for player in client.players:
-                    await message.channel.send(f'__{player.name}:__', files=[await f.to_file() for f in player.attachments])
-                    player.attachments.clear()
+                    if player.registered:
+                        if player.attachments:
+                            await message.channel.send(f'__{player.name}:__', files=[await f.to_file() for f in player.attachments])
+                            player.attachments.clear()
+                        else:
+                            await message.channel.send(f'__{player.name}:__ No image submitted')
+                    
 
         def tally_scores(self):
             '''Sorts players and returns a list of strings to send as Discord messages'''
@@ -371,8 +376,12 @@ def main():
                 scoreboard += line
             await channel.send(scoreboard)
             for player in client.players:
-                await channel.send(f'__{player.name}:__', files=[await f.to_file() for f in player.attachments])
-                player.attachments.clear()
+                if player.registered:
+                    if player.attachments:
+                        await channel.send(f'__{player.name}:__', files=[await f.to_file() for f in player.attachments])
+                        player.attachments.clear()
+                    else:
+                        await channel.send(f'__{player.name}:__ No image submitted')
 
         everyone = ''
         for player in client.players:
