@@ -50,7 +50,7 @@ def main():
                 self.registered = True
                 self.completedToday = False
                 self.succeededToday = False
-                self.attachments = discord.Attachment
+                self.attachments = []
 
         def __init__(self, intents):
             super(WordleTrackerClient, self).__init__(intents=intents)
@@ -58,6 +58,7 @@ def main():
             self.text_channel = 0
             self.random_letter_starting = False
             self.scored_today = False
+            self.midnight_called = False
             self.players = []
 
         def read_json_file(self):
@@ -132,8 +133,7 @@ def main():
                     scoreboard += line
                 await message.channel.send(scoreboard)
                 for player in client.players:
-                    await message.channel.send(f'__{player.name}:__')
-                    await message.channel.send(player.attachment)
+                    await message.channel.send(f'__{player.name}:__', files=[await f.to_file() for f in player.attachments])
                     player.attachments.clear()
 
         def tally_scores(self):
@@ -165,6 +165,7 @@ def main():
                         winners.append(player_it)
                     else:
                         break
+            self.scored_today = True
 
             place_counter = 1
             prev_guesses = 0
@@ -215,6 +216,7 @@ def main():
         for player in client.players:
             checkScored = checkScored and player.completedToday
         client.scored_today = checkScored
+        print(f'{get_log_time()}> Scored today: {client.scored_today}')
         if not midnight_call.is_running():
             midnight_call.start()
         print(f'{get_log_time()}> {client.user} has connected to Discord!')
@@ -257,15 +259,13 @@ def main():
 
             # process player's results
             await client.process(message, player)
-        elif not client.scored_today and message.attachments and message.content == '':
+        elif not client.scored_today and message.attachments and message.attachments[0].is_spoiler():
             for player in client.players:
-                if message.author.name == player.name and not player.attachments:
-                    if len(message.attachments) == 1:
-                        player.attachment = message.attachments
-                    else:
-                        player.attachment = message.attachments[0]
-                    await message.channel.send(f'Received image from {message.author.name}.')
-                    await message.delete()
+                if message.author.name == player.name:
+                    if not player.attachments:
+                        player.attachments = message.attachments
+                        await message.channel.send(f'Received image from {message.author.name}.')
+                        await message.delete()
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
     async def register_command(interaction):
@@ -333,38 +333,46 @@ def main():
     @tasks.loop(seconds=1)
     async def midnight_call():
         '''Midnight call loop task that is run every second with a midnight check.'''
+        hour, minute = get_time()
+        if not client.scored_today and hour == 23 and minute == 0:
+            warning = ''
+            for player in client.players:
+                if player.registered and not player.completedToday:
+                    user = discord.utils.get(client.users, name=player.name)
+                    warning += f'{user.mention} '
+            if warning != '':
+                await channel.send(f'{warning}, you have one hour left to do the Wordle!')
+
+        if hour == 0 and minute == 1:
+            client.midnight_called = False
+        if client.midnight_called or hour != 0 or minute != 0:
+            return
+        client.midnight_called = True
+
         if not client.players:
             return
 
-        hour, minute = get_time()
-        if client.scored_today and hour == 0 and minute == 1:
-            client.scored_today = False
-        if hour != 0 or minute != 0 or client.scored_today:
-            return
+        print(f'{get_log_time()}> It is midnight, sending daily scoreboard if unscored and then mentioning registered players')
 
-        print(f'{get_log_time()}> It is midnight, sending daily scoreboard and then mentioning registered players')
-        
         channel = client.get_channel(int(client.text_channel))
-        shamed = ''
-        for player in client.players:
-            if player.registered and not player.completedToday:
-                user = discord.utils.get(client.users, name=player.name)
-                if user:
-                    shamed += f'{user.mention} '
-                else:
-                    print(f'{get_log_time()}> Failed to mention user {player.name}')
-        if shamed != '':
-            await channel.send(f'SHAME ON {shamed} FOR NOT DOING THE WORDLE!')
         if not client.scored_today:
+            shamed = ''
+            for player in client.players:
+                if player.registered and not player.completedToday:
+                    user = discord.utils.get(client.users, name=player.name)
+                    if user:
+                        shamed += f'{user.mention} '
+                    else:
+                        print(f'{get_log_time()}> Failed to mention user {player.name}')
+            if shamed != '':
+                await channel.send(f'SHAME ON {shamed} FOR NOT DOING THE WORDLE!')
             scoreboard = ''
             for line in client.tally_scores():
                 scoreboard += line
             await channel.send(scoreboard)
             for player in client.players:
-                await channel.send(f'__{player.name}:__')
-                await channel.send(player.attachment)
+                await channel.send(f'__{player.name}:__', files=[await f.to_file() for f in player.attachments])
                 player.attachments.clear()
-        client.scored_today = True
 
         everyone = ''
         for player in client.players:
