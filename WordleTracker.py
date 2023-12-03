@@ -333,6 +333,9 @@ def main():
     @tasks.loop(seconds=1)
     async def midnight_call():
         '''Midnight call loop task that is run every second with a midnight check.'''
+        if not client.players:
+            return
+
         hour, minute = get_time()
         if not client.scored_today and hour == 23 and minute == 0:
             warning = ''
@@ -348,9 +351,6 @@ def main():
         if client.midnight_called or hour != 0 or minute != 0:
             return
         client.midnight_called = True
-
-        if not client.players:
-            return
 
         print(f'{get_log_time()}> It is midnight, sending daily scoreboard if unscored and then mentioning registered players')
 
