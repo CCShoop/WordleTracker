@@ -52,6 +52,7 @@ def main():
                 self.succeededToday = False
                 self.attachments = []
 
+
         def __init__(self, intents):
             super(WordleTrackerClient, self).__init__(intents=intents)
             self.tree = app_commands.CommandTree(self)
@@ -60,6 +61,7 @@ def main():
             self.scored_today = False
             self.midnight_called = False
             self.players = []
+
 
         def read_json_file(self):
             '''Reads player information from the json file and puts it in the players list'''
@@ -90,6 +92,7 @@ def main():
                                   f'succeeded: {load_player.succeededToday}')
                     print(f'{get_log_time()}> Successfully loaded {self.FILENAME}')
 
+
         def write_json_file(self):
             '''Writes player information from the players list to the json file'''
             data = {}
@@ -106,22 +109,28 @@ def main():
             with open(self.FILENAME, 'w+', encoding='utf-8') as file:
                 file.write(json_data)
 
+
         async def process(self, message: discord.Message, player: Player):
-            parseGuesses = message.content.split('/')
-            parseGuesses = parseGuesses[0].split(' ', -1)
-            player.guesses = int(parseGuesses[2])
+            try:
+                parseGuesses = message.content.split('/')
+                parseGuesses = parseGuesses[0].split(' ', -1)
+                player.guesses = int(parseGuesses[2])
 
-            parseSuccess = message.content.splitlines()[-1].strip()
-            player.succeededToday = parseSuccess == '🟩🟩🟩🟩🟩'
-            print(f'{get_log_time()}> Player {player.name} - guesses: {player.guesses}, succeeded: {player.succeededToday}')
+                parseSuccess = message.content.splitlines()[-1].strip()
+                player.succeededToday = parseSuccess == '🟩🟩🟩🟩🟩'
+                print(f'{get_log_time()}> Player {player.name} - guesses: {player.guesses}, succeeded: {player.succeededToday}')
 
-            player.completedToday = True
-            client.write_json_file()
-            if player.succeededToday:
-                await message.channel.send(f'{message.author.name} guessed the word in {player.guesses} guesses.')
-            else:
-                await message.channel.send(f'{message.author.name} did not guess the word.')
-            await message.delete()
+                player.completedToday = True
+                client.write_json_file()
+                if player.succeededToday:
+                    await message.channel.send(f'{message.author.name} guessed the word in {player.guesses} guesses.')
+                else:
+                    await message.channel.send(f'{message.author.name} did not guess the word.')
+                await message.delete()
+            except:
+                print(f'{get_log_time()}> User {player.name} submitted invalid result message')
+                await message.channel.send(f'{player.name}, you sent a Wordle results message with invalid syntax. Please try again.')
+                await message.delete()
 
             allPlayersGuessed = True
             for player in client.players:
@@ -214,6 +223,7 @@ def main():
     discord_token = os.getenv('DISCORD_TOKEN')
     client = WordleTrackerClient(intents=Intents.all())
 
+
     @client.event
     async def on_ready():
         client.read_json_file()
@@ -225,6 +235,7 @@ def main():
         if not midnight_call.is_running():
             midnight_call.start()
         print(f'{get_log_time()}> {client.user} has connected to Discord!')
+
 
     @client.event
     async def on_message(message: discord.Message):
@@ -271,6 +282,7 @@ def main():
                         player.attachments = message.attachments
                         await message.channel.send(f'Received image from {message.author.name}.')
                         await message.delete()
+
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
     async def register_command(interaction):
@@ -383,6 +395,7 @@ def main():
                     else:
                         await channel.send(f'__{player.name}:__ No image submitted')
 
+        client.scored_today = False
         everyone = ''
         for player in client.players:
             player.guesses = 0
