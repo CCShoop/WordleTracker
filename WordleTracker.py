@@ -143,11 +143,9 @@ def main():
                     response += f'{message.author.name} did not guess the word.\n'
                 response += 'Please send a screenshot of your guesses as a spoiler attachment, **NOT** a link.'
                 await message.channel.send(response)
-                await message.delete()
             except:
                 print(f'{get_log_time()}> User {player.name} submitted invalid result message')
                 await message.channel.send(f'{player.name}, you sent a Wordle results message with invalid syntax. Please try again.')
-                await message.delete()
                     
 
         def tally_scores(self):
@@ -245,10 +243,10 @@ def main():
             return
 
         if 'Wordle' in message.content and '/' in message.content and ('⬛' in message.content or '🟨' in message.content or '🟩' in message.content):
+            await message.delete()
             # no registered players
             if not client.players:
                 await message.channel.send(f'{message.author.mention}, there are no registered players! Please register and resend your results to be the first.')
-                await message.delete()
                 return
             # find player in memory
             player: client.Player
@@ -260,13 +258,11 @@ def main():
             # player is not registered
             if not foundPlayer:
                 await message.channel.send(f'{message.author.name}, you are not registered! Please register and resend your results.')
-                await message.delete()
                 return
             # player has already sent results
             if player.completedToday:
                 print(f'{get_log_time()}> {player.name} tried to resubmit results')
                 await message.channel.send(f'{player.name}, you have already submitted your results today.')
-                await message.delete()
                 return
 
             # set channel
@@ -276,6 +272,7 @@ def main():
             # process player's results
             await client.process(message, player)
         elif message.attachments and message.attachments[0].is_spoiler():
+            await message.delete()
             for player in client.players:
                 if message.author.name == player.name:
                     if player.filePath == '':
@@ -283,7 +280,6 @@ def main():
                         with open(player.filePath, 'wb') as file:
                             await message.attachments[0].save(file)
                         await message.channel.send(f'Received image from {message.author.name}.')
-                        await message.delete()
                     break
 
         for player in client.players:
@@ -295,8 +291,7 @@ def main():
         await message.channel.send(scoreboard)
         for player in client.players:
             if player.registered and player.filePath != '':
-                with File(player.filePath) as file:
-                    await message.channel.send(content=f'__{player.name}:__', file=file)
+                await message.channel.send(content=f'__{player.name}:__', file=File(player.filePath))
                 try:
                     os.remove(player.filePath)
                 except OSError as e:
@@ -409,8 +404,7 @@ def main():
             await channel.send(scoreboard)
             for player in client.players:
                 if player.registered and player.filePath != '':
-                    with File(player.filePath) as file:
-                        await channel.send(content=f'__{player.name}:__', file=file)
+                    await channel.send(content=f'__{player.name}:__', file=File(player.filePath))
                     try:
                         os.remove(player.filePath)
                     except OSError as e:
