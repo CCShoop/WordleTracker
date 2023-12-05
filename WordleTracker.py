@@ -6,7 +6,7 @@ import random
 import discord
 import datetime
 from dotenv import load_dotenv
-from discord import app_commands, Intents, Client
+from discord import app_commands, Intents, Client, File
 from discord.ext import tasks
 
 load_dotenv()
@@ -50,7 +50,7 @@ def main():
                 self.registered = True
                 self.completedToday = False
                 self.succeededToday = False
-                self.attachments = []
+                self.filePath = ''
 
 
         def __init__(self, intents):
@@ -278,24 +278,30 @@ def main():
         elif message.attachments and message.attachments[0].is_spoiler():
             for player in client.players:
                 if message.author.name == player.name:
-                    if not player.attachments:
-                        player.attachments = message.attachments
+                    if player.filePath == '':
+                        player.filePath = f'{message.author.name}.png'
+                        with open(player.filePath, 'wb') as file:
+                            await message.attachments[0].save(file)
                         await message.channel.send(f'Received image from {message.author.name}.')
                         await message.delete()
+                    break
 
         for player in client.players:
-            if player.registered and (not player.completedToday or not player.attachments):
+            if player.registered and (not player.completedToday or player.filePath == ''):
                 return
         scoreboard = ''
         for line in client.tally_scores():
             scoreboard += line
         await message.channel.send(scoreboard)
         for player in client.players:
-            if player.registered:
-                if player.attachments:
-                    file = discord.File(player.attachments[0])
+            if player.registered and player.filePath != '':
+                with File(player.filePath) as file:
                     await message.channel.send(content=f'__{player.name}:__', file=file)
-                    player.attachments.clear()
+                try:
+                    os.remove(player.filePath)
+                except OSError as e:
+                    print(f'Error deleting {player.filePath}: {e}')
+                player.filePath = ''
 
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
@@ -402,11 +408,14 @@ def main():
                 scoreboard += line
             await channel.send(scoreboard)
             for player in client.players:
-                if player.registered:
-                    if player.attachments:
-                        file = discord.File(player.attachments[0])
+                if player.registered and player.filePath != '':
+                    with File(player.filePath) as file:
                         await channel.send(content=f'__{player.name}:__', file=file)
-                        player.attachments.clear()
+                    try:
+                        os.remove(player.filePath)
+                    except OSError as e:
+                        print(f'Error deleting {player.filePath}: {e}')
+                    player.filePath = ''
 
         client.scored_today = False
         everyone = ''
