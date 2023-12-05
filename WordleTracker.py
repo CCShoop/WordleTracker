@@ -58,6 +58,7 @@ def main():
             self.tree = app_commands.CommandTree(self)
             self.text_channel = 0
             self.random_letter_starting = False
+            self.last_letters = []
             self.scored_today = False
             self.midnight_called = False
             self.players = []
@@ -76,6 +77,14 @@ def main():
                         elif firstField == 'random_letter':
                             self.random_letter_starting = secondField['random_letter']
                             print(f'{get_log_time()}> Got random letter starting value of {self.random_letter_starting}')
+                        elif firstField == 'last_letters':
+                            self.last_letters.clear()
+                            self.last_letters.append(secondField['0'])
+                            self.last_letters.append(secondField['1'])
+                            self.last_letters.append(secondField['2'])
+                            self.last_letters.append(secondField['3'])
+                            self.last_letters.append(secondField['4'])
+                            print(f'{get_log_time()}> Got last letters of {self.last_letters[0]}, {self.last_letters[1]}, {self.last_letters[2]}, {self.last_letters[3]}, {self.last_letters[4]}')
                         else:
                             load_player = self.Player(firstField)
                             load_player.winCount = secondField['winCount']
@@ -98,6 +107,11 @@ def main():
             data = {}
             data['text_channel'] = {'text_channel': self.text_channel}
             data['random_letter'] = {'random_letter': self.random_letter_starting}
+            data['last_letters'] = {'0': self.last_letters[0],
+                                    '1': self.last_letters[1],
+                                    '2': self.last_letters[2],
+                                    '3': self.last_letters[3],
+                                    '4': self.last_letters[4]}
             for player in self.players:
                 data[player.name] = {'winCount': player.winCount,
                                      'guesses': player.guesses,
@@ -122,32 +136,18 @@ def main():
 
                 player.completedToday = True
                 client.write_json_file()
+                response = ''
                 if player.succeededToday:
-                    await message.channel.send(f'{message.author.name} guessed the word in {player.guesses} guesses.')
+                    response += f'{message.author.name} guessed the word in {player.guesses} guesses.\n'
                 else:
-                    await message.channel.send(f'{message.author.name} did not guess the word.')
+                    response += f'{message.author.name} did not guess the word.\n'
+                response += 'Please send a screenshot of your guesses as a spoiler attachment, **NOT** a link.'
+                await message.channel.send(response)
                 await message.delete()
             except:
                 print(f'{get_log_time()}> User {player.name} submitted invalid result message')
                 await message.channel.send(f'{player.name}, you sent a Wordle results message with invalid syntax. Please try again.')
                 await message.delete()
-
-            allPlayersGuessed = True
-            for player in client.players:
-                if player.registered:
-                    allPlayersGuessed = allPlayersGuessed and player.completedToday
-            if allPlayersGuessed:
-                scoreboard = ''
-                for line in client.tally_scores():
-                    scoreboard += line
-                await message.channel.send(scoreboard)
-                for player in client.players:
-                    if player.registered:
-                        if player.attachments:
-                            await message.channel.send(f'__{player.name}:__', files=[await f.to_file() for f in player.attachments])
-                            player.attachments.clear()
-                        else:
-                            await message.channel.send(f'__{player.name}:__ No image submitted')
                     
 
         def tally_scores(self):
@@ -241,7 +241,7 @@ def main():
     async def on_message(message: discord.Message):
         '''Client on_message event'''
         # message is from this bot or not in dedicated text channel
-        if message.author == client.user or message.channel.id != client.text_channel:
+        if message.channel.id != client.text_channel or message.author == client.user or client.scored_today:
             return
 
         if 'Wordle' in message.content and '/' in message.content and ('⬛' in message.content or '🟨' in message.content or '🟩' in message.content):
@@ -275,13 +275,27 @@ def main():
 
             # process player's results
             await client.process(message, player)
-        elif not client.scored_today and message.attachments and message.attachments[0].is_spoiler():
+        elif message.attachments and message.attachments[0].is_spoiler():
             for player in client.players:
                 if message.author.name == player.name:
                     if not player.attachments:
                         player.attachments = message.attachments
                         await message.channel.send(f'Received image from {message.author.name}.')
                         await message.delete()
+
+        for player in client.players:
+            if player.registered and (not player.completedToday or not player.attachments):
+                return
+        scoreboard = ''
+        for line in client.tally_scores():
+            scoreboard += line
+        await message.channel.send(scoreboard)
+        for player in client.players:
+            if player.registered:
+                if player.attachments:
+                    file = discord.File(player.attachments[0])
+                    await message.channel.send(content=f'__{player.name}:__', file=file)
+                    player.attachments.clear()
 
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
@@ -390,10 +404,9 @@ def main():
             for player in client.players:
                 if player.registered:
                     if player.attachments:
-                        await channel.send(f'__{player.name}:__', files=[await f.to_file() for f in player.attachments])
+                        file = discord.File(player.attachments[0])
+                        await channel.send(content=f'__{player.name}:__', file=file)
                         player.attachments.clear()
-                    else:
-                        await channel.send(f'__{player.name}:__ No image submitted')
 
         client.scored_today = False
         everyone = ''
@@ -410,8 +423,17 @@ def main():
         await channel.send(f'{everyone}\nIt\'s time to do the Wordle!\nhttps://www.nytimes.com/games/wordle/index.html')
         if client.random_letter_starting:
             letter = chr(random.randint(ord("A"), ord("Z")))
-            while letter == 'X':
+            while letter in client.last_letters:
                 letter = chr(random.randint(ord("A"), ord("Z")))
+            found = False
+            for lastLetter in client.last_letters:
+                if found:
+                    lastLetter = 'X'
+                    break
+                if lastLetter == 'X':
+                    lastLetter = letter
+                    found = True
+                    
             await channel.send(f'__**Your first word must start with the letter "{letter}"**__')
 
     client.run(discord_token)
