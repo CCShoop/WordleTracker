@@ -272,10 +272,10 @@ def main():
             # process player's results
             await client.process(message, player)
         elif message.attachments and message.attachments[0].is_spoiler():
-            await message.delete()
             for player in client.players:
                 if message.author.name == player.name:
                     if player.filePath == '':
+                        await message.delete()
                         player.filePath = f'{message.author.name}.png'
                         with open(player.filePath, 'wb') as file:
                             await message.attachments[0].save(file)
