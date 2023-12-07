@@ -6,7 +6,7 @@ import random
 import discord
 import datetime
 from dotenv import load_dotenv
-from discord import app_commands, Intents, Client, File
+from discord import app_commands, Intents, Client, File, Interaction
 from discord.ext import tasks
 
 load_dotenv()
@@ -300,7 +300,7 @@ def main():
 
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
-    async def register_command(interaction):
+    async def register_command(interaction: Interaction):
         '''Command to register a player'''
         client.text_channel = int(interaction.channel.id)
         client.write_json_file()
@@ -327,7 +327,7 @@ def main():
 
 
     @client.tree.command(name='deregister', description='Deregister from Wordle tracking. Use twice to delete saved data.')
-    async def deregister_command(interaction):
+    async def deregister_command(interaction: Interaction):
         '''Command to deregister a player'''
         client.text_channel = int(interaction.channel.id)
         client.write_json_file()
@@ -353,7 +353,7 @@ def main():
 
 
     @client.tree.command(name='randomletterstart', description='State a random letter to start the Wordle guessing with.')
-    async def randomletterstart_command(interaction):
+    async def randomletterstart_command(interaction: Interaction):
         '''Command to enable random letter starts'''
         client.text_channel = int(interaction.channel.id)
         client.random_letter_starting = not client.random_letter_starting
@@ -362,12 +362,33 @@ def main():
         await interaction.response.send_message(f'Random letter starting has been toggled to {client.random_letter_starting}.')
 
 
+    @client.tree.command(name='getletter', description='Get a new random letter for today.')
+    async def getletter_command(interaction: Interaction):
+        '''Command to get a new random letter start'''
+        if client.random_letter_starting:
+            letter = chr(random.randint(ord("A"), ord("Z")))
+            while letter in client.last_letters:
+                letter = chr(random.randint(ord("A"), ord("Z")))
+            found = False
+            for lastLetter in client.last_letters:
+                if found:
+                    lastLetter = 'X'
+                    break
+                if lastLetter == 'X':
+                    lastLetter = letter
+                    found = True
+            await interaction.response.send_message(f'__**Your first word must start with the letter "{letter}"**__')
+        else:
+            await interaction.response.send_message(f'Random letter starting is disabled, please enable it before running /getletter.')
+
+
     @tasks.loop(seconds=1)
     async def midnight_call():
         '''Midnight call loop task that is run every second with a midnight check.'''
         if not client.players:
             return
 
+        channel = client.get_channel(int(client.text_channel))
         hour, minute = get_time()
         if not client.scored_today and hour == 23 and minute == 0:
             warning = ''
@@ -386,7 +407,6 @@ def main():
 
         print(f'{get_log_time()}> It is midnight, sending daily scoreboard if unscored and then mentioning registered players')
 
-        channel = client.get_channel(int(client.text_channel))
         if not client.scored_today:
             shamed = ''
             for player in client.players:
@@ -436,7 +456,6 @@ def main():
                 if lastLetter == 'X':
                     lastLetter = letter
                     found = True
-                    
             await channel.send(f'__**Your first word must start with the letter "{letter}"**__')
 
     client.run(discord_token)
