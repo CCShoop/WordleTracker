@@ -378,6 +378,7 @@ def main():
                 if lastLetter == 'X':
                     lastLetter = letter
                     found = True
+            client.write_json_file()
             await interaction.response.send_message(f'__**Your first word must start with the letter "{letter}"**__')
         else:
             await interaction.response.send_message(f'Random letter starting is disabled, please enable it before running /getletter.')
@@ -460,6 +461,7 @@ def main():
                 if lastLetter == 'X':
                     lastLetter = letter
                     found = True
+            client.write_json_file()
             await channel.send(f'__**Your first word must start with the letter "{letter}"**__')
 
     client.run(discord_token)
