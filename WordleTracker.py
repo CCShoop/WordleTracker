@@ -60,6 +60,7 @@ def main():
             self.random_letter_starting = False
             self.last_letters = []
             self.scored_today = False
+            self.sent_warning = False
             self.midnight_called = False
             self.players = []
 
@@ -390,7 +391,9 @@ def main():
 
         channel = client.get_channel(int(client.text_channel))
         hour, minute = get_time()
-        if not client.scored_today and hour == 23 and minute == 0:
+        if client.sent_warning and hour == 23 and minute == 1:
+            client.sent_warning = False
+        if not client.sent_warning and not client.scored_today and hour == 23 and minute == 0:
             warning = ''
             for player in client.players:
                 if player.registered and not player.completedToday:
@@ -398,6 +401,7 @@ def main():
                     warning += f'{user.mention} '
             if warning != '':
                 await channel.send(f'{warning}, you have one hour left to do the Wordle!')
+            client.sent_warning = True
 
         if hour == 0 and minute == 1:
             client.midnight_called = False
