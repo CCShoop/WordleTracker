@@ -404,7 +404,7 @@ def main():
                 await channel.send(f'{warning}, you have one hour left to do the Wordle!')
             client.sent_warning = True
 
-        if hour == 0 and minute == 1:
+        if client.midnight_called and hour == 0 and minute == 1:
             client.midnight_called = False
             client.write_json_file()
         if client.midnight_called or hour != 0 or minute != 0:
