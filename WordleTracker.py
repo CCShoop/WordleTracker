@@ -174,7 +174,7 @@ def main():
                 winners.append(first_winner)
                 # for the rest of the players, check if they're tied
                 for player_it in wordle_players[1:]:
-                    if player_it.guesses == first_winner.guesses:
+                    if player_it.guesses == first_winner.guesses and player_it.succeededToday:
                         winners.append(player_it)
                     else:
                         break
@@ -406,6 +406,7 @@ def main():
 
         if hour == 0 and minute == 1:
             client.midnight_called = False
+            client.write_json_file()
         if client.midnight_called or hour != 0 or minute != 0:
             return
         client.midnight_called = True
