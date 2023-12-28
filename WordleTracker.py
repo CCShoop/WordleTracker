@@ -119,7 +119,7 @@ def main():
                                      'registered': player.registered,
                                      'completedToday': player.completedToday,
                                      'succeededToday': player.succeededToday}
-            json_data = json.dumps(data)
+            json_data = json.dumps(data, indent=4)
             print(f'{get_log_time()}> Writing {self.FILENAME}')
             with open(self.FILENAME, 'w+', encoding='utf-8') as file:
                 file.write(json_data)
