@@ -134,8 +134,7 @@ def main():
                     player.succeededToday = False
                 else:
                     player.guesses = int(parseGuesses[2])
-                    parseSuccess = message.content.splitlines()[-1].strip()
-                    player.succeededToday = parseSuccess == '🟩🟩🟩🟩🟩'
+                    player.succeededToday = True
                 print(f'{get_log_time()}> Player {player.name} - guesses: {player.guesses}, succeeded: {player.succeededToday}')
 
                 player.completedToday = True
