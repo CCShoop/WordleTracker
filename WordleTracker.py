@@ -133,7 +133,7 @@ def main():
             if self.scored_today:
                 return
             for player in self.players:
-                if player.completedToday and os.exists(f'{player.name}.png'):
+                if player.completedToday and os.path.exists(f'{player.name}.png'):
                     player.filePath = f'{player.name}.png'
                     print(f'{get_log_time()}> Found {player.name}\'s answers as file {player.filePath}')
 
