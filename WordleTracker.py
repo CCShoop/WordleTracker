@@ -129,10 +129,13 @@ def main():
             try:
                 parseGuesses = message.content.split('/')
                 parseGuesses = parseGuesses[0].split(' ', -1)
-                player.guesses = int(parseGuesses[2])
-
-                parseSuccess = message.content.splitlines()[-1].strip()
-                player.succeededToday = parseSuccess == '🟩🟩🟩🟩🟩'
+                if parseGuesses[2] == 'X':
+                    player.guesses = 6
+                    player.succeededToday = False
+                else:
+                    player.guesses = int(parseGuesses[2])
+                    parseSuccess = message.content.splitlines()[-1].strip()
+                    player.succeededToday = parseSuccess == '🟩🟩🟩🟩🟩'
                 print(f'{get_log_time()}> Player {player.name} - guesses: {player.guesses}, succeeded: {player.succeededToday}')
 
                 player.completedToday = True
