@@ -75,6 +75,9 @@ def main():
                         if firstField == 'text_channel':
                             self.text_channel = secondField['text_channel']
                             print(f'{get_log_time()}> Got text channel id of {self.text_channel}')
+                        elif firstField == 'scored_today':
+                            self.scored_today = secondField['scored_today']
+                            print(f'{get_log_time()}> Scored today: {self.scored_today}')
                         elif firstField == 'random_letter':
                             self.random_letter_starting = secondField['random_letter']
                             print(f'{get_log_time()}> Got random letter starting value of {self.random_letter_starting}')
@@ -107,6 +110,7 @@ def main():
             '''Writes player information from the players list to the json file'''
             data = {}
             data['text_channel'] = {'text_channel': self.text_channel}
+            data['scored_today'] = {'scored_today': self.scored_today}
             data['random_letter'] = {'random_letter': self.random_letter_starting}
             data['last_letters'] = {'0': self.last_letters[0],
                                     '1': self.last_letters[1],
@@ -123,6 +127,15 @@ def main():
             print(f'{get_log_time()}> Writing {self.FILENAME}')
             with open(self.FILENAME, 'w+', encoding='utf-8') as file:
                 file.write(json_data)
+
+
+        def get_previous_answers(self):
+            if self.scored_today:
+                return
+            for player in self.players:
+                if player.completedToday and os.exists(f'{player.name}.png'):
+                    player.filePath = f'{player.name}.png'
+                    print(f'{get_log_time()}> Found {player.name}\'s answers as file {player.filePath}')
 
 
         async def process(self, message: discord.Message, player: Player):
@@ -228,11 +241,7 @@ def main():
     @client.event
     async def on_ready():
         client.read_json_file()
-        checkScored = True
-        for player in client.players:
-            checkScored = checkScored and player.completedToday
-        client.scored_today = checkScored
-        print(f'{get_log_time()}> Scored today: {client.scored_today}')
+        client.get_previous_answers()
         if not midnight_call.is_running():
             midnight_call.start()
         print(f'{get_log_time()}> {client.user} has connected to Discord!')
