@@ -59,6 +59,7 @@ def main():
             self.text_channel:TextChannel = None
             self.random_letter_starting = False
             self.last_letters = []
+            self.game_number:int = 0
             self.scored_today = False
             self.sent_warning = False
             self.midnight_called = False
@@ -75,6 +76,8 @@ def main():
                         if firstField == 'text_channel':
                             self.text_channel = self.get_channel(int(secondField['text_channel']))
                             print(f'{get_log_time()}> Got text channel id of {self.text_channel.id}')
+                        elif firstField == 'game_number':
+                            self.game_number = int(secondField['game_number'])
                         elif firstField == 'scored_today':
                             self.scored_today = secondField['scored_today']
                             print(f'{get_log_time()}> Scored today: {self.scored_today}')
@@ -88,7 +91,8 @@ def main():
                             self.last_letters.append(secondField['2'])
                             self.last_letters.append(secondField['3'])
                             self.last_letters.append(secondField['4'])
-                            print(f'{get_log_time()}> Got last letters of {self.last_letters[0]}, {self.last_letters[1]}, {self.last_letters[2]}, {self.last_letters[3]}, {self.last_letters[4]}')
+                            self.last_letters.append(secondField['5'])
+                            print(f'{get_log_time()}> Got last letters of {self.last_letters[0]}, {self.last_letters[1]}, {self.last_letters[2]}, {self.last_letters[3]}, {self.last_letters[4]}, {self.last_letters[5]}')
                         else:
                             load_player = self.Player(firstField)
                             load_player.winCount = secondField['winCount']
@@ -110,13 +114,15 @@ def main():
             '''Writes player information from the players list to the json file'''
             data = {}
             data['text_channel'] = {'text_channel': self.text_channel.id}
+            data['game_number'] = {'game_number': self.game_number}
             data['scored_today'] = {'scored_today': self.scored_today}
             data['random_letter'] = {'random_letter': self.random_letter_starting}
             data['last_letters'] = {'0': self.last_letters[0],
                                     '1': self.last_letters[1],
                                     '2': self.last_letters[2],
                                     '3': self.last_letters[3],
-                                    '4': self.last_letters[4]}
+                                    '4': self.last_letters[4],
+                                    '5': self.last_letters[5]}
             for player in self.players:
                 data[player.name] = {'winCount': player.winCount,
                                      'guesses': player.guesses,
@@ -142,6 +148,9 @@ def main():
             try:
                 parseGuesses = message.content.split('/')
                 parseGuesses = parseGuesses[0].split(' ', -1)
+                if int(parseGuesses[1]) != self.game_number:
+                    message.channel.send(f'You sent results for Wordle #{parseGuesses[1]}; I\'m currently only accepting results for Wordle #{self.game_number}.')
+                    return
                 if parseGuesses[2] == 'X':
                     player.guesses = 6
                     player.succeededToday = False
@@ -174,7 +183,7 @@ def main():
             winners = [] # list of winners - the one/those with the lowest score
             losers = [] # list of losers - people who didn't successfully guess the word
             results = [] # list of strings - the scoreboard to print out
-            results.append('WORDLING COMPLETE!\n\n**SCOREBOARD:**\n')
+            results.append(f'WORDLE #{self.game_number} COMPLETE!\n\n**SCOREBOARD:**\n')
 
             # sort the players
             wordle_players = []
@@ -403,10 +412,13 @@ def main():
         for lastLetter in client.last_letters:
             if found:
                 lastLetter = 'X'
+                found = False
                 break
             if lastLetter == 'X':
                 lastLetter = letter
                 found = True
+        if found:
+            client.last_letters[0] = 'X'
         client.write_json_file()
         await interaction.response.send_message(f'__**Your first word must start with the letter "{letter}"**__')
 
@@ -449,7 +461,7 @@ def main():
                     else:
                         print(f'{get_log_time()}> Failed to mention user {player.name}')
             if shamed != '':
-                await client.text_channel.send(f'SHAME ON {shamed} FOR NOT DOING THE WORDLE!')
+                await client.text_channel.send(f'SHAME ON {shamed} FOR NOT DOING WORDLE #{client.game_number}!')
             scoreboard = ''
             for line in client.tally_scores():
                 scoreboard += line
@@ -475,7 +487,8 @@ def main():
                     everyone += f'{user.mention} '
             else:
                 print(f'{get_log_time()}> Failed to mention user {player.name}')
-        await client.text_channel.send(f'{everyone}\nIt\'s time to do the Wordle!\nhttps://www.nytimes.com/games/wordle/index.html')
+        client.game_number += 1
+        await client.text_channel.send(f'{everyone}\nIt\'s time to do Wordle #{client.game_number}!\nhttps://www.nytimes.com/games/wordle/index.html')
         if client.random_letter_starting:
             letter = chr(random.randint(ord("A"), ord("Z")))
             while letter in client.last_letters:
@@ -484,10 +497,13 @@ def main():
             for lastLetter in client.last_letters:
                 if found:
                     lastLetter = 'X'
+                    found = False
                     break
                 if lastLetter == 'X':
                     lastLetter = letter
                     found = True
+            if found:
+                client.last_letters[0] = 'X'
             client.write_json_file()
             await client.text_channel.send(f'__**Your first word must start with the letter "{letter}"**__')
 
