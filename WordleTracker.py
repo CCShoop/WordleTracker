@@ -185,7 +185,8 @@ def main():
                     response += f'{message.author.name} guessed the word in {player.guesses} guesses.\n'
                 else:
                     response += f'{message.author.name} did not guess the word.\n'
-                response += 'Please send a screenshot of your guesses as a spoiler attachment, **NOT** a link.'
+                if player.filePath == '':
+                    response += 'Please send a screenshot of your guesses as a spoiler attachment, **NOT** a link.'
                 await message.channel.send(response)
             except:
                 print(f'{get_log_time()}> User {player.name} submitted invalid result message')
@@ -335,7 +336,10 @@ def main():
                         player.filePath = f'{message.author.name}.png'
                         with open(player.filePath, 'wb') as file:
                             await message.attachments[0].save(file)
-                        await message.channel.send(f'Received image from {message.author.name}.')
+                        response = f'Received image from {message.author.name}.\n'
+                        if not player.completedToday:
+                            response += 'Please copy and send your Wordle-generated results.'
+                        await message.channel.send(response)
                     break
 
         for player in client.players:
