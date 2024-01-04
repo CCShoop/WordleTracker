@@ -3,10 +3,9 @@
 import os
 import json
 import random
-import discord
 import datetime
 from dotenv import load_dotenv
-from discord import app_commands, Intents, Client, File, Interaction, TextChannel
+from discord import app_commands, Intents, Client, File, Message, Interaction, TextChannel, utils
 from discord.ext import tasks
 
 load_dotenv()
@@ -163,7 +162,7 @@ def main():
             return letter
 
 
-        async def process(self, message: discord.Message, player: Player):
+        async def process(self, message: Message, player: Player):
             try:
                 parseGuesses = message.content.split('/')
                 parseGuesses = parseGuesses[0].split(' ', -1)
@@ -293,7 +292,7 @@ def main():
 
 
     @client.event
-    async def on_message(message: discord.Message):
+    async def on_message(message: Message):
         '''Client on_message event'''
         # message is from this bot or not in dedicated text channel
         if message.channel.id != client.text_channel.id or message.author == client.user or client.scored_today:
@@ -444,7 +443,7 @@ def main():
             warning = ''
             for player in client.players:
                 if player.registered and not player.completedToday:
-                    user = discord.utils.get(client.users, name=player.name)
+                    user = utils.get(client.users, name=player.name)
                     warning += f'{user.mention} '
             if warning != '':
                 await client.text_channel.send(f'{warning}, you have one hour left to do (or skip) the Wordle #{client.game_number}!')
@@ -463,7 +462,7 @@ def main():
             shamed = ''
             for player in client.players:
                 if player.registered and not player.completedToday:
-                    user = discord.utils.get(client.users, name=player.name)
+                    user = utils.get(client.users, name=player.name)
                     if user:
                         shamed += f'{user.mention} '
                     else:
@@ -489,7 +488,7 @@ def main():
             player.guesses = 0
             player.completedToday = False
             player.succeededToday = False
-            user = discord.utils.get(client.users, name=player.name)
+            user = utils.get(client.users, name=player.name)
             if user:
                 if player.registered:
                     everyone += f'{user.mention} '
