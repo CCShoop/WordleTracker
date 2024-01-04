@@ -366,22 +366,20 @@ def main():
     @client.tree.command(name='getletter', description='Get a new random letter for today.')
     async def getletter_command(interaction: Interaction):
         '''Command to get a new random letter start'''
-        if client.random_letter_starting:
+        client.random_letter_starting = True
+        letter = chr(random.randint(ord("A"), ord("Z")))
+        while letter in client.last_letters:
             letter = chr(random.randint(ord("A"), ord("Z")))
-            while letter in client.last_letters:
-                letter = chr(random.randint(ord("A"), ord("Z")))
-            found = False
-            for lastLetter in client.last_letters:
-                if found:
-                    lastLetter = 'X'
-                    break
-                if lastLetter == 'X':
-                    lastLetter = letter
-                    found = True
-            client.write_json_file()
-            await interaction.response.send_message(f'__**Your first word must start with the letter "{letter}"**__')
-        else:
-            await interaction.response.send_message(f'Random letter starting is disabled, please enable it before running /getletter.')
+        found = False
+        for lastLetter in client.last_letters:
+            if found:
+                lastLetter = 'X'
+                break
+            if lastLetter == 'X':
+                lastLetter = letter
+                found = True
+        client.write_json_file()
+        await interaction.response.send_message(f'__**Your first word must start with the letter "{letter}"**__')
 
 
     @tasks.loop(seconds=1)
@@ -401,7 +399,7 @@ def main():
                     user = discord.utils.get(client.users, name=player.name)
                     warning += f'{user.mention} '
             if warning != '':
-                await channel.send(f'{warning}, you have one hour left to do the Wordle!')
+                await channel.send(f'{warning}, you have one hour left to do (or skip) the Wordle!')
             client.sent_warning = True
 
         if client.midnight_called and hour == 0 and minute == 1:
