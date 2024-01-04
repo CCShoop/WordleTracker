@@ -144,6 +144,25 @@ def main():
                     print(f'{get_log_time()}> Found {player.name}\'s answers as file {player.filePath}')
 
 
+        def get_letter(self):
+            letter = chr(random.randint(ord("A"), ord("Z")))
+            while letter in client.last_letters:
+                letter = chr(random.randint(ord("A"), ord("Z")))
+            found = False
+            for i in range(len(client.last_letters)):
+                if found:
+                    client.last_letters[i] = 'X'
+                    found = False
+                    break
+                if client.last_letters[i] == 'X':
+                    client.last_letters[i] = letter
+                    found = True
+            if found:
+                client.last_letters[0] = 'X'
+            client.write_json_file()
+            return letter
+
+
         async def process(self, message: discord.Message, player: Player):
             try:
                 parseGuesses = message.content.split('/')
@@ -319,7 +338,6 @@ def main():
                         await message.channel.send(f'Received image from {message.author.name}.')
                     break
 
-        client.get_previous_answers()
         for player in client.players:
             if player.registered and (not player.completedToday or player.filePath == ''):
                 print(f'{get_log_time()}> Waiting for {player.name}')
@@ -405,21 +423,7 @@ def main():
     async def getletter_command(interaction: Interaction):
         '''Command to get a new random letter start'''
         client.random_letter_starting = True
-        letter = chr(random.randint(ord("A"), ord("Z")))
-        while letter in client.last_letters:
-            letter = chr(random.randint(ord("A"), ord("Z")))
-        found = False
-        for lastLetter in client.last_letters:
-            if found:
-                lastLetter = 'X'
-                found = False
-                break
-            if lastLetter == 'X':
-                lastLetter = letter
-                found = True
-        if found:
-            client.last_letters[0] = 'X'
-        client.write_json_file()
+        letter = client.get_letter()
         await interaction.response.send_message(f'__**Your first word must start with the letter "{letter}"**__')
 
 
@@ -490,21 +494,7 @@ def main():
         client.game_number += 1
         await client.text_channel.send(f'{everyone}\nIt\'s time to do Wordle #{client.game_number}!\nhttps://www.nytimes.com/games/wordle/index.html')
         if client.random_letter_starting:
-            letter = chr(random.randint(ord("A"), ord("Z")))
-            while letter in client.last_letters:
-                letter = chr(random.randint(ord("A"), ord("Z")))
-            found = False
-            for lastLetter in client.last_letters:
-                if found:
-                    lastLetter = 'X'
-                    found = False
-                    break
-                if lastLetter == 'X':
-                    lastLetter = letter
-                    found = True
-            if found:
-                client.last_letters[0] = 'X'
-            client.write_json_file()
+            letter = client.get_letter()
             await client.text_channel.send(f'__**Your first word must start with the letter "{letter}"**__')
 
     client.run(discord_token)
