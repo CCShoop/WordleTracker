@@ -6,7 +6,7 @@ import random
 import discord
 import datetime
 from dotenv import load_dotenv
-from discord import app_commands, Intents, Client, File, Interaction
+from discord import app_commands, Intents, Client, File, Interaction, TextChannel
 from discord.ext import tasks
 
 load_dotenv()
@@ -56,7 +56,7 @@ def main():
         def __init__(self, intents):
             super(WordleTrackerClient, self).__init__(intents=intents)
             self.tree = app_commands.CommandTree(self)
-            self.text_channel = 0
+            self.text_channel:TextChannel = None
             self.random_letter_starting = False
             self.last_letters = []
             self.scored_today = False
@@ -73,8 +73,8 @@ def main():
                     data = json.load(file)
                     for firstField, secondField in data.items():
                         if firstField == 'text_channel':
-                            self.text_channel = secondField['text_channel']
-                            print(f'{get_log_time()}> Got text channel id of {self.text_channel}')
+                            self.text_channel = self.get_channel(int(secondField['text_channel']))
+                            print(f'{get_log_time()}> Got text channel id of {self.text_channel.id}')
                         elif firstField == 'scored_today':
                             self.scored_today = secondField['scored_today']
                             print(f'{get_log_time()}> Scored today: {self.scored_today}')
@@ -109,7 +109,7 @@ def main():
         def write_json_file(self):
             '''Writes player information from the players list to the json file'''
             data = {}
-            data['text_channel'] = {'text_channel': self.text_channel}
+            data['text_channel'] = {'text_channel': self.text_channel.id}
             data['scored_today'] = {'scored_today': self.scored_today}
             data['random_letter'] = {'random_letter': self.random_letter_starting}
             data['last_letters'] = {'0': self.last_letters[0],
@@ -242,6 +242,22 @@ def main():
     async def on_ready():
         client.read_json_file()
         client.get_previous_answers()
+        for player in client.players:
+            if player.registered and (not player.completedToday or player.filePath == ''):
+                print(f'{get_log_time()}> Waiting for {player.name}')
+                return
+        scoreboard = ''
+        for line in client.tally_scores():
+            scoreboard += line
+        await client.text_channel.send(scoreboard)
+        for player in client.players:
+            if player.registered and player.filePath != '':
+                await client.text_channel.send(content=f'__{player.name}:__', file=File(player.filePath))
+                try:
+                    os.remove(player.filePath)
+                except OSError as e:
+                    print(f'{get_log_time()}> Error deleting {player.filePath}: {e}')
+                player.filePath = ''
         if not midnight_call.is_running():
             midnight_call.start()
         print(f'{get_log_time()}> {client.user} has connected to Discord!')
@@ -251,7 +267,7 @@ def main():
     async def on_message(message: discord.Message):
         '''Client on_message event'''
         # message is from this bot or not in dedicated text channel
-        if message.channel.id != client.text_channel or message.author == client.user or client.scored_today:
+        if message.channel.id != client.text_channel.id or message.author == client.user or client.scored_today:
             return
 
         if 'Wordle' in message.content and '/' in message.content and ('⬛' in message.content or '🟨' in message.content or '🟩' in message.content):
@@ -278,7 +294,7 @@ def main():
                 return
 
             # set channel
-            client.text_channel = int(message.channel.id)
+            client.text_channel = message.channel
             client.write_json_file()
 
             # process player's results
@@ -294,8 +310,10 @@ def main():
                         await message.channel.send(f'Received image from {message.author.name}.')
                     break
 
+        client.get_previous_answers()
         for player in client.players:
             if player.registered and (not player.completedToday or player.filePath == ''):
+                print(f'{get_log_time()}> Waiting for {player.name}')
                 return
         scoreboard = ''
         for line in client.tally_scores():
@@ -307,14 +325,14 @@ def main():
                 try:
                     os.remove(player.filePath)
                 except OSError as e:
-                    print(f'Error deleting {player.filePath}: {e}')
+                    print(f'{get_log_time()}> Error deleting {player.filePath}: {e}')
                 player.filePath = ''
 
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
     async def register_command(interaction: Interaction):
         '''Command to register a player'''
-        client.text_channel = int(interaction.channel.id)
+        client.text_channel = interaction.channel
         client.write_json_file()
         response = ''
         playerFound = False
@@ -341,7 +359,7 @@ def main():
     @client.tree.command(name='deregister', description='Deregister from Wordle tracking. Use twice to delete saved data.')
     async def deregister_command(interaction: Interaction):
         '''Command to deregister a player'''
-        client.text_channel = int(interaction.channel.id)
+        client.text_channel = interaction.channel
         client.write_json_file()
         players_copy = client.players.copy()
         response = ''
@@ -367,7 +385,7 @@ def main():
     @client.tree.command(name='randomletterstart', description='State a random letter to start the Wordle guessing with.')
     async def randomletterstart_command(interaction: Interaction):
         '''Command to enable random letter starts'''
-        client.text_channel = int(interaction.channel.id)
+        client.text_channel = interaction.channel
         client.random_letter_starting = not client.random_letter_starting
         client.write_json_file()
         print(f'{get_log_time()}> Random letter starting toggled to {client.random_letter_starting}')
@@ -399,7 +417,6 @@ def main():
         if not client.players:
             return
 
-        channel = client.get_channel(int(client.text_channel))
         hour, minute = get_time()
         if client.sent_warning and hour == 23 and minute == 1:
             client.sent_warning = False
@@ -410,7 +427,7 @@ def main():
                     user = discord.utils.get(client.users, name=player.name)
                     warning += f'{user.mention} '
             if warning != '':
-                await channel.send(f'{warning}, you have one hour left to do (or skip) the Wordle!')
+                await client.text_channel.send(f'{warning}, you have one hour left to do (or skip) the Wordle!')
             client.sent_warning = True
 
         if client.midnight_called and hour == 0 and minute == 1:
@@ -432,14 +449,14 @@ def main():
                     else:
                         print(f'{get_log_time()}> Failed to mention user {player.name}')
             if shamed != '':
-                await channel.send(f'SHAME ON {shamed} FOR NOT DOING THE WORDLE!')
+                await client.text_channel.send(f'SHAME ON {shamed} FOR NOT DOING THE WORDLE!')
             scoreboard = ''
             for line in client.tally_scores():
                 scoreboard += line
-            await channel.send(scoreboard)
+            await client.text_channel.send(scoreboard)
             for player in client.players:
                 if player.registered and player.filePath != '':
-                    await channel.send(content=f'__{player.name}:__', file=File(player.filePath))
+                    await client.text_channel.send(content=f'__{player.name}:__', file=File(player.filePath))
                     try:
                         os.remove(player.filePath)
                     except OSError as e:
@@ -458,7 +475,7 @@ def main():
                     everyone += f'{user.mention} '
             else:
                 print(f'{get_log_time()}> Failed to mention user {player.name}')
-        await channel.send(f'{everyone}\nIt\'s time to do the Wordle!\nhttps://www.nytimes.com/games/wordle/index.html')
+        await client.text_channel.send(f'{everyone}\nIt\'s time to do the Wordle!\nhttps://www.nytimes.com/games/wordle/index.html')
         if client.random_letter_starting:
             letter = chr(random.randint(ord("A"), ord("Z")))
             while letter in client.last_letters:
@@ -472,7 +489,7 @@ def main():
                     lastLetter = letter
                     found = True
             client.write_json_file()
-            await channel.send(f'__**Your first word must start with the letter "{letter}"**__')
+            await client.text_channel.send(f'__**Your first word must start with the letter "{letter}"**__')
 
     client.run(discord_token)
 
