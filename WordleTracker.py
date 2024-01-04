@@ -447,7 +447,7 @@ def main():
                     user = discord.utils.get(client.users, name=player.name)
                     warning += f'{user.mention} '
             if warning != '':
-                await client.text_channel.send(f'{warning}, you have one hour left to do (or skip) the Wordle!')
+                await client.text_channel.send(f'{warning}, you have one hour left to do (or skip) the Wordle #{client.game_number}!')
             client.sent_warning = True
 
         if client.midnight_called and hour == 0 and minute == 1:
