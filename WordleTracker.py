@@ -270,22 +270,6 @@ def main():
     async def on_ready():
         client.read_json_file()
         client.get_previous_answers()
-        for player in client.players:
-            if player.registered and (not player.completedToday or player.filePath == ''):
-                print(f'{get_log_time()}> Waiting for {player.name}')
-                return
-        scoreboard = ''
-        for line in client.tally_scores():
-            scoreboard += line
-        await client.text_channel.send(scoreboard)
-        for player in client.players:
-            if player.registered and player.filePath != '':
-                await client.text_channel.send(content=f'__{player.name}:__', file=File(player.filePath))
-                try:
-                    os.remove(player.filePath)
-                except OSError as e:
-                    print(f'{get_log_time()}> Error deleting {player.filePath}: {e}')
-                player.filePath = ''
         if not midnight_call.is_running():
             midnight_call.start()
         print(f'{get_log_time()}> {client.user} has connected to Discord!')
@@ -341,6 +325,7 @@ def main():
                         await message.channel.send(response)
                     break
 
+        if client.scored_today: return
         for player in client.players:
             if player.registered and (not player.completedToday or player.filePath == ''):
                 print(f'{get_log_time()}> Waiting for {player.name}')
