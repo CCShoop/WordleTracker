@@ -93,6 +93,9 @@ def main():
                             self.last_letters.append(secondField['5'])
                             print(f'{get_log_time()}> Got last letters of {self.last_letters[0]}, {self.last_letters[1]}, {self.last_letters[2]}, {self.last_letters[3]}, {self.last_letters[4]}, {self.last_letters[5]}')
                         else:
+                            for player in self.players:
+                                if firstField == player.name:
+                                    continue
                             load_player = self.Player(firstField)
                             load_player.winCount = secondField['winCount']
                             load_player.guesses = secondField['guesses']
