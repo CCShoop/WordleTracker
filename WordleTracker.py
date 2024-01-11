@@ -439,7 +439,6 @@ def main():
 
         if client.midnight_called and hour == 0 and minute == 1:
             client.midnight_called = False
-            client.write_json_file()
         if client.midnight_called or hour != 0 or minute != 0:
             return
         client.midnight_called = True
@@ -487,6 +486,7 @@ def main():
         if client.random_letter_starting:
             letter = client.get_letter()
             await client.text_channel.send(f'__**Your first word must start with the letter "{letter}"**__')
+        client.write_json_file()
 
     client.run(discord_token)
 
