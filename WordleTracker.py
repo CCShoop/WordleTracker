@@ -213,17 +213,22 @@ def main():
                 if player.registered:
                     wordle_players.append(player)
             wordle_players.sort(key=get_guesses)
-            if wordle_players[0].succeededToday:
-                # if the player(s) with the lowest score successfully
-                # guessed the game, they are the first winner
-                first_winner = wordle_players[0]
-                winners.append(first_winner)
-                # for the rest of the players, check if they're tied
-                for player_it in wordle_players[1:]:
-                    if player_it.guesses == first_winner.guesses and player_it.succeededToday:
-                        winners.append(player_it)
-                    else:
-                        break
+            if wordle_players[0].score == 6:
+                for wordle_player in wordle_players:
+                    if wordle_player.succeededToday:
+                        winners.append(wordle_player)
+            else:
+                if wordle_players[0].succeededToday:
+                    # if the player(s) with the lowest score successfully
+                    # guessed the game, they are the first winner
+                    first_winner = wordle_players[0]
+                    winners.append(first_winner)
+                    # for the rest of the players, check if they're tied
+                    for player_it in wordle_players[1:]:
+                        if player_it.guesses == first_winner.guesses and player_it.succeededToday:
+                            winners.append(player_it)
+                        else:
+                            break
             self.scored_today = True
 
             place_counter = 1
