@@ -202,7 +202,7 @@ def main():
                 print('No players to score')
                 return
 
-            print(f'{get_log_time()}> Tallying scores')
+            print(f'{get_log_time()}> Tallying guesses')
             winners = [] # list of winners - the one/those with the lowest score
             losers = [] # list of losers - people who didn't successfully guess the word
             results = [] # list of strings - the scoreboard to print out
@@ -211,10 +211,10 @@ def main():
             # sort the players
             wordle_players = []
             for player in self.players:
-                if player.registered:
+                if player.registered and player.completedToday:
                     wordle_players.append(player)
             wordle_players.sort(key=get_guesses)
-            if wordle_players[0].score == 6:
+            if wordle_players[0].guesses == 6:
                 for wordle_player in wordle_players:
                     if wordle_player.succeededToday:
                         winners.append(wordle_player)
