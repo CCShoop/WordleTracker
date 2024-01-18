@@ -50,6 +50,7 @@ def main():
                 self.completedToday = False
                 self.succeededToday = False
                 self.filePath = ''
+                self.messageContent = ''
 
 
         def __init__(self, intents):
@@ -323,14 +324,17 @@ def main():
             for player in client.players:
                 if message.author.name == player.name:
                     if player.filePath == '':
-                        await message.delete()
-                        player.filePath = f'{message.author.name}.png'
-                        with open(player.filePath, 'wb') as file:
-                            await message.attachments[0].save(file)
                         response = f'Received image from {message.author.name}.\n'
-                        if not player.completedToday:
-                            response += 'Please copy and send your Wordle-generated results.'
-                        await message.channel.send(response)
+                    else:
+                        response = f'Received replacement image from {message.author.name}.\n'
+                    await message.delete()
+                    player.filePath = f'{message.author.name}.png'
+                    with open(player.filePath, 'wb') as file:
+                        await message.attachments[0].save(file)
+                    player.messageContent = message.content
+                    if not player.completedToday:
+                        response += 'Please copy and send your Wordle-generated results.'
+                    await message.channel.send(response)
                     break
 
         if client.scored_today: return
@@ -344,12 +348,13 @@ def main():
         await message.channel.send(scoreboard)
         for player in client.players:
             if player.registered and player.filePath != '':
-                await message.channel.send(content=f'__{player.name}:__', file=File(player.filePath))
+                await message.channel.send(content=f'__{player.name}:__\n{player.messageContent}', file=File(player.filePath))
                 try:
                     os.remove(player.filePath)
                 except OSError as e:
                     print(f'{get_log_time()}> Error deleting {player.filePath}: {e}')
                 player.filePath = ''
+                player.messageContent = ''
 
 
     @client.tree.command(name='register', description='Register for Wordle tracking.')
@@ -467,12 +472,13 @@ def main():
             await client.text_channel.send(scoreboard)
             for player in client.players:
                 if player.registered and player.filePath != '':
-                    await client.text_channel.send(content=f'__{player.name}:__', file=File(player.filePath))
+                    await client.text_channel.send(content=f'__{player.name}:__\n{player.messageContent}', file=File(player.filePath))
                     try:
                         os.remove(player.filePath)
                     except OSError as e:
                         print(f'Error deleting {player.filePath}: {e}')
                     player.filePath = ''
+                    player.messageContent = ''
 
         client.scored_today = False
         everyone = ''
