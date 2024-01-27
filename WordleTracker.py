@@ -94,22 +94,25 @@ def main():
                             self.last_letters.append(secondField['5'])
                             print(f'{get_log_time()}> Got last letters of {self.last_letters[0]}, {self.last_letters[1]}, {self.last_letters[2]}, {self.last_letters[3]}, {self.last_letters[4]}, {self.last_letters[5]}')
                         else:
+                            player_exists = False
                             for player in self.players:
                                 if firstField == player.name:
-                                    continue
-                            load_player = self.Player(firstField)
-                            load_player.winCount = secondField['winCount']
-                            load_player.guesses = secondField['guesses']
-                            load_player.registered = secondField['registered']
-                            load_player.completedToday = secondField['completedToday']
-                            load_player.succeededToday = secondField['succeededToday']
-                            self.players.append(load_player)
-                            print(f'{get_log_time()}> Loaded player {load_player.name} - '
-                                  f'wins: {load_player.winCount}, '
-                                  f'guesses: {load_player.guesses}, '
-                                  f'registered: {load_player.registered}, '
-                                  f'completed: {load_player.completedToday}, '
-                                  f'succeeded: {load_player.succeededToday}')
+                                    player_exists = True
+                                    break
+                            if not player_exists:
+                                load_player = self.Player(firstField)
+                                load_player.winCount = secondField['winCount']
+                                load_player.guesses = secondField['guesses']
+                                load_player.registered = secondField['registered']
+                                load_player.completedToday = secondField['completedToday']
+                                load_player.succeededToday = secondField['succeededToday']
+                                self.players.append(load_player)
+                                print(f'{get_log_time()}> Loaded player {load_player.name} - '
+                                    f'wins: {load_player.winCount}, '
+                                    f'guesses: {load_player.guesses}, '
+                                    f'registered: {load_player.registered}, '
+                                    f'completed: {load_player.completedToday}, '
+                                    f'succeeded: {load_player.succeededToday}')
                     print(f'{get_log_time()}> Successfully loaded {self.FILENAME}')
 
 
