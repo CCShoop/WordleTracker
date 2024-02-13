@@ -345,6 +345,7 @@ def main():
             if player.registered and (not player.completedToday or player.filePath == ''):
                 print(f'{get_log_time()}> Waiting for {player.name}')
                 return
+        await client.text_channel.edit(name='wordle-reignited')
         scoreboard = ''
         for line in client.tally_scores():
             scoreboard += line
@@ -429,6 +430,7 @@ def main():
         client.random_letter_starting = True
         letter = client.get_letter()
         await interaction.response.send_message(f'__**Your first word must start with the letter "{letter}"**__')
+        await interaction.channel.edit(name=f'letter-{letter}-wordle')
 
 
     @tasks.loop(seconds=1)
@@ -469,6 +471,7 @@ def main():
                         print(f'{get_log_time()}> Failed to mention user {player.name}')
             if shamed != '':
                 await client.text_channel.send(f'SHAME ON {shamed} FOR NOT DOING WORDLE #{client.game_number}!')
+            await client.text_channel.edit(name='wordle')
             scoreboard = ''
             for line in client.tally_scores():
                 scoreboard += line
@@ -500,6 +503,7 @@ def main():
         if client.random_letter_starting:
             letter = client.get_letter()
             await client.text_channel.send(f'__**Your first word must start with the letter "{letter}"**__')
+            await client.text_channel.edit(name=f'letter-{letter}-wordle')
         client.write_json_file()
 
     client.run(discord_token)
