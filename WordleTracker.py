@@ -323,7 +323,7 @@ def main():
 
             # process player's results
             await client.process(message, player)
-        elif message.channel.id == client.text_channel.id and message.attachments and message.attachments[0].is_spoiler():
+        if message.attachments and message.attachments[0].is_spoiler():
             for player in client.players:
                 if message.author.name == player.name:
                     if player.filePath == '':
