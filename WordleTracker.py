@@ -191,7 +191,7 @@ def main():
                     response += f'{message.author.name} guessed the word in {player.guesses} guesses.\n'
                 else:
                     response += f'{message.author.name} did not guess the word.\n'
-                if player.filePath == '':
+                if player.filePath == '' and not message.attachments:
                     response += 'Please send a screenshot of your guesses as a spoiler attachment, **NOT** a link.'
                 await message.channel.send(response)
             except:
@@ -317,12 +317,11 @@ def main():
                 await message.channel.send(f'{player.name}, you have already submitted your results today.')
                 return
 
-            # set channel
-            client.text_channel = message.channel
             client.write_json_file()
 
             # process player's results
             await client.process(message, player)
+
         if message.attachments and message.attachments[0].is_spoiler():
             for player in client.players:
                 if message.author.name == player.name:
