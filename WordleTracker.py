@@ -168,10 +168,10 @@ def main():
             client.write_json_file()
             return letter
 
-
         async def process(self, message: Message, player: Player):
             try:
                 parseGuesses = message.content.split('/')
+                parseGuesses[0] = parseGuesses[0].replace(' 🎉', '').replace(',', '')
                 parseGuesses = parseGuesses[0].split(' ', -1)
                 if int(parseGuesses[1]) != self.game_number:
                     message.channel.send(f'You sent results for Wordle #{parseGuesses[1]}; I\'m currently only accepting results for Wordle #{self.game_number}.')
