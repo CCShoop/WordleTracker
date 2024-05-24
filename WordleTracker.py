@@ -329,7 +329,6 @@ def main():
                         response = f'Received image from {message.author.name}.\n'
                     else:
                         response = f'Received replacement image from {message.author.name}.\n'
-                    await message.delete()
                     player.filePath = f'{message.author.name}.png'
                     with open(player.filePath, 'wb') as file:
                         await message.attachments[0].save(file)
@@ -337,6 +336,7 @@ def main():
                     if not player.completedToday:
                         response += 'Please copy and send your Wordle-generated results.'
                     await message.channel.send(response)
+                    await message.delete()
                     break
 
         if client.scored_today: return
