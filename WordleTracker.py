@@ -14,13 +14,6 @@ from discord.ext import tasks
 load_dotenv()
 
 
-def get_time():
-    ct = str(datetime.now())
-    hour = int(ct[11:13])
-    minute = int(ct[14:16])
-    return hour, minute
-
-
 def get_log_time():
     time = datetime.now().astimezone()
     output = ''
@@ -85,23 +78,62 @@ class WordleTrackerClient(Client):
         def __init__(self, name):
             self.name = name
             self.guesses = 0
+            self.newGuesses = 0
             self.winCount = 0
             self.registered = True
             self.completedToday = False
+            self.completedYesterday = False
             self.succeededToday = False
+            self.succeededYesterday = False
             self.filePath = ''
+            self.newFilePath = ''
             self.messageContent = ''
+            self.newMessageContent = ''
             self.resetTime: datetime = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            self.sentWarning = False
+
+        async def send_warning(self, curTime: datetime) -> None:
+            if self.registered and not self.completedToday and not self.sentWarning and curTime + timedelta(hours=1) >= self.resetTime:
+                user = utils.get(client.users, name=self.name)
+                await user.send(f'You have one hour left to do (or skip) Wordle #{client.game_number}!')
+
+        def past_reset_time(self, curTime: datetime) -> bool:
+            if curTime >= self.resetTime:
+                return True
+            return False
+
+        def shift_data(self) -> None:
+            self.guesses = self.newGuesses
+            self.newGuesses = 0
+            self.completedYesterday = self.completedToday
+            self.completedToday = False
+            self.succeededYesterday = self.succeededToday
+            self.succeededToday = False
+            self.filePath = self.newFilePath
+            self.newFilePath = ''
+            self.messageContent = self.newMessageContent
+            self.newMessageContent = ''
+            self.resetTime += timedelta(days=1)
+            self.sentWarning = False
+
+        async def notify_of_wordle(self) -> None:
+            user = utils.get(client.users, name=self.name)
+            content = f'It\'s time to do Wordle #{client.game_number}!\n'
+            content += 'https://www.nytimes.com/games/wordle/index.html\n'
+            await user.send(content=content)
+            if client.random_letter_starting:
+                content = f'__**Your first word must start with the letter "{client.letter}"**__'
+                await user.send(content=content)
 
     def __init__(self, intents):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
         self.text_channel: TextChannel = None
         self.random_letter_starting = False
+        self.current_letter = ''
         self.last_letters = ['K', 'B', 'C', 'D', 'Z', 'F']
         self.game_number: int = 0
         self.scored_today = False
-        self.sent_warning = False
         self.midnight_called = False
         self.players = []
 
@@ -123,6 +155,9 @@ class WordleTrackerClient(Client):
                     elif firstField == 'random_letter':
                         self.random_letter_starting = secondField['random_letter']
                         print(f'{get_log_time()}> Got random letter starting value of {self.random_letter_starting}')
+                    elif firstField == 'current_letter':
+                        self.current_letter = secondField['current_letter']
+                        print(f'{get_log_time()}> Got current letter as ')
                     elif firstField == 'last_letters':
                         self.last_letters.clear()
                         self.last_letters.append(secondField['0'])
@@ -142,22 +177,53 @@ class WordleTrackerClient(Client):
                             load_player = self.Player(firstField)
                             load_player.winCount = secondField['winCount']
                             load_player.guesses = secondField['guesses']
+                            try:
+                                load_player.newGuesses = secondField['newGuesses']
+                            except Exception as e:
+                                print(f"{load_player.name} had no newGuesses, setting to 0: {e}")
+                                load_player.newGuesses = 0
                             load_player.registered = secondField['registered']
                             load_player.completedToday = secondField['completedToday']
+                            try:
+                                load_player.completedYesterday = secondField['completedYesterday']
+                            except:
+                                load_player.completedYesterday = load_player.completedToday
                             load_player.succeededToday = secondField['succeededToday']
+                            try:
+                                load_player.succeededYesterday = secondField['succeededYesterday']
+                            except:
+                                load_player.succeededYesterday = load_player.succeededToday
+                            try:
+                                load_player.messageContent = secondField['messageContent']
+                            except:
+                                load_player.messageContent = ''
+                            try:
+                                load_player.newMessageContent = secondField['newMessageContent']
+                            except:
+                                load_player.newMessageContent = load_player.messageContent
                             try:
                                 load_player.resetTime = datetime.fromisoformat(secondField['resetTime'])
                             except Exception as e:
-                                print(f'{load_player.name} had no reset time, defaulting to ET: {e}')
+                                print(f'{load_player.name} had no resetTime, defaulting to ET: {e}')
                                 load_player.resetTime = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                            try:
+                                load_player.sentWarning = secondField['sentWarning']
+                            except Exception as e:
+                                print(f'{load_player.name} had no sentWarning, defaulting to False: {e}')
                             self.players.append(load_player)
-                            print(f'{get_log_time()}> Loaded player {load_player.name} - '
-                                  f'wins: {load_player.winCount}, '
-                                  f'guesses: {load_player.guesses}, '
-                                  f'registered: {load_player.registered}, '
-                                  f'completed: {load_player.completedToday}, '
-                                  f'succeeded: {load_player.succeededToday}, '
-                                  f'timezone: {load_player.resetTime.strftime("%d/%m %H:%M")}')
+                            print(f'{get_log_time()}> Loaded player {load_player.name}\n'
+                                  f'\twins: {load_player.winCount}\n'
+                                  f'\tguesses: {load_player.guesses}\n'
+                                  f'\tnew guesses: {load_player.newGuesses}\n'
+                                  f'\tregistered: {load_player.registered}\n'
+                                  f'\tcompleted today: {load_player.completedToday}\n'
+                                  f'\tcompleted yesterday: {load_player.completedYesterday}\n'
+                                  f'\tsucceeded today: {load_player.succeededToday}\n'
+                                  f'\tsucceeded yesterday: {load_player.succeededYesterday}\n'
+                                  f'\tmessage content: {load_player.messageContent}\n'
+                                  f'\tnew message content: {load_player.newMessageContent}\n'
+                                  f'\treset time: {load_player.resetTime.strftime("%d/%m %H:%M")}\n'
+                                  f'\tsent warning: {load_player.sentWarning}')
                 print(f'{get_log_time()}> Successfully loaded {self.FILENAME}')
 
     def write_json_file(self):
@@ -167,6 +233,7 @@ class WordleTrackerClient(Client):
         data['game_number'] = {'game_number': self.game_number}
         data['scored_today'] = {'scored_today': self.scored_today}
         data['random_letter'] = {'random_letter': self.random_letter_starting}
+        data['current_letter'] = {'current_letter': self.current_letter}
         data['last_letters'] = {'0': self.last_letters[0],
                                 '1': self.last_letters[1],
                                 '2': self.last_letters[2],
@@ -176,24 +243,31 @@ class WordleTrackerClient(Client):
         for player in self.players:
             data[player.name] = {'winCount': player.winCount,
                                  'guesses': player.guesses,
+                                 'newGuesses': player.newGuesses,
                                  'registered': player.registered,
                                  'completedToday': player.completedToday,
+                                 'completedYesterday': player.completedYesterday,
                                  'succeededToday': player.succeededToday,
-                                 'resetTime': player.resetTime.isoformat()}
+                                 'succeededYesterday': player.succeededYesterday,
+                                 'messageContent': player.messageContent,
+                                 'newMessageContent': player.newMessageContent,
+                                 'resetTime': player.resetTime.isoformat(),
+                                 'sentWarning': player.sentWarning}
         json_data = json.dumps(data, indent=4)
         print(f'{get_log_time()}> Writing {self.FILENAME}')
         with open(self.FILENAME, 'w+', encoding='utf-8') as file:
             file.write(json_data)
 
-    def get_previous_answers(self):
-        if self.scored_today:
-            return
+    def get_previous_answers(self) -> None:
         for player in self.players:
-            if player.completedToday and os.path.exists(f'{player.name}.png'):
+            if os.path.exists(f'{player.name}.png'):
                 player.filePath = f'{player.name}.png'
                 print(f'{get_log_time()}> Found {player.name}\'s answers as file {player.filePath}')
+            if os.path.exists(f'{player.name}_new.png'):
+                player.newFilePath = f'{player.name}_new.png'
+                print(f'{get_log_time()}> Found {player.name}\'s new answers as file {player.newFilePath}')
 
-    def get_letter(self):
+    def get_new_letter(self) -> None:
         letter = chr(random.randint(ord("A"), ord("Z")))
         while letter in client.last_letters:
             letter = chr(random.randint(ord("A"), ord("Z")))
@@ -208,8 +282,8 @@ class WordleTrackerClient(Client):
                 found = True
         if found:
             client.last_letters[0] = 'X'
+        self.current_letter = letter
         client.write_json_file()
-        return letter
 
     async def process(self, message: Message, player: Player):
         try:
@@ -220,21 +294,21 @@ class WordleTrackerClient(Client):
                 message.channel.send(f'You sent results for Wordle #{parseGuesses[1]}; I\'m currently only accepting results for Wordle #{self.game_number}.')
                 return
             if parseGuesses[2] == 'X':
-                player.guesses = 6
+                player.newGuesses = 6
                 player.succeededToday = False
             else:
-                player.guesses = int(parseGuesses[2])
+                player.newGuesses = int(parseGuesses[2])
                 player.succeededToday = True
-            print(f'{get_log_time()}> Player {player.name} - guesses: {player.guesses}, succeeded: {player.succeededToday}')
+            print(f'{get_log_time()}> Player {player.name} - newGuesses: {player.newGuesses}, succeeded: {player.succeededToday}')
 
             player.completedToday = True
             client.write_json_file()
             response = ''
             if player.succeededToday:
-                response += f'{message.author.name} guessed the word in {player.guesses} guesses.\n'
+                response += f'{message.author.name} guessed the word in {player.newGuesses} guesses.\n'
             else:
                 response += f'{message.author.name} did not guess the word.\n'
-            if player.filePath == '' and not message.attachments:
+            if player.newFilePath == '' and not message.attachments:
                 response += 'Please send a screenshot of your guesses as a spoiler attachment, **NOT** a link.'
             await message.channel.send(response)
         except:
@@ -256,7 +330,7 @@ class WordleTrackerClient(Client):
         # sort the players
         wordle_players = []
         for player in self.players:
-            if player.registered and player.completedToday:
+            if player.registered and player.completedYesterday:
                 wordle_players.append(player)
         wordle_players.sort(key=get_guesses)
         if wordle_players[0].guesses == 6:
@@ -318,12 +392,12 @@ class WordleTrackerClient(Client):
 
 discord_token = os.getenv('DISCORD_TOKEN')
 client = WordleTrackerClient(intents=Intents.all())
+client.read_json_file()
+client.get_previous_answers()
 
 
 @client.event
 async def on_ready():
-    client.read_json_file()
-    client.get_previous_answers()
     if not midnight_call.is_running():
         midnight_call.start()
     print(f'{get_log_time()}> {client.user} has connected to Discord!')
@@ -332,8 +406,7 @@ async def on_ready():
 @client.event
 async def on_message(message: Message):
     '''Client on_message event'''
-    # message is from this bot or not in dedicated text channel
-    if message.author.bot or client.scored_today:
+    if message.author.bot:
         return
     try:
         if message.channel != client.text_channel:
@@ -373,14 +446,14 @@ async def on_message(message: Message):
     if message.attachments and message.attachments[0].is_spoiler():
         for player in client.players:
             if message.author.name == player.name:
-                if player.filePath == '':
+                if player.newFilePath == '':
                     response = f'Received image from {message.author.name}.\n'
                 else:
                     response = f'Received replacement image from {message.author.name}.\n'
-                player.filePath = f'{message.author.name}.png'
-                with open(player.filePath, 'wb') as file:
+                player.newFilePath = f'{message.author.name}_new.png'
+                with open(player.newFilePath, 'wb') as file:
                     await message.attachments[0].save(file)
-                player.messageContent = message.content
+                player.newMessageContent = message.content
                 if not player.completedToday:
                     response += 'Please copy and send your Wordle-generated results.'
                 await message.channel.send(response)
@@ -390,10 +463,10 @@ async def on_message(message: Message):
     if client.scored_today:
         return
     for player in client.players:
-        if player.registered and (not player.completedToday or player.filePath == ''):
+        if player.registered and (not player.completedYesterday or player.filePath == ''):
             print(f'{get_log_time()}> Waiting for {player.name}')
             return
-    await client.text_channel.edit(name='wordle-reignited')
+    await client.text_channel.edit(name=f'letter-{client.current_letter}-wordle')
     scoreboard = ''
     for line in client.tally_scores():
         scoreboard += line
@@ -471,22 +544,22 @@ async def timezone_command(interaction: Interaction):
 
 
 @client.tree.command(name='randomletterstart', description='State a random letter to start the Wordle guessing with.')
-async def randomletterstart_command(interaction: Interaction):
+@app_commands.describe(random_letters='Whether you want forced starting with a random letter.')
+async def randomletterstart_command(interaction: Interaction, random_letters: bool = True):
     '''Command to enable random letter starts'''
     client.text_channel = interaction.channel
-    client.random_letter_starting = not client.random_letter_starting
+    client.random_letter_starting = random_letters
+    client.get_new_letter()
     client.write_json_file()
-    print(f'{get_log_time()}> Random letter starting toggled to {client.random_letter_starting}')
-    await interaction.response.send_message(f'Random letter starting has been toggled to {client.random_letter_starting}.')
-
-
-@client.tree.command(name='getletter', description='Get a new random letter for today.')
-async def getletter_command(interaction: Interaction):
-    '''Command to get a new random letter start'''
-    client.random_letter_starting = True
-    letter = client.get_letter()
-    await interaction.response.send_message(f'__**Your first word must start with the letter "{letter}"**__')
-    await interaction.channel.edit(name=f'letter-{letter}-wordle')
+    print(f'{get_log_time()}> Random letter starting set to {client.random_letter_starting}; letter is "{client.letter}"')
+    if client.random_letter_starting:
+        content = f'Random letter starting has been enabled; the current letter is "{client.current_letter}".'
+        channelName = f'letter-{client.letter}-wordle'
+    else:
+        content = 'Random letter starting has been disabled.'
+        channelName = 'wordle'
+    await interaction.response.send_message(content=content)
+    await client.text_channel.edit(name=channelName)
 
 
 @tasks.loop(seconds=1)
@@ -495,74 +568,77 @@ async def midnight_call():
     if not client.players:
         return
 
-    # warning code
-    hour, minute = get_time()
-    if client.sent_warning and hour == 23 and minute == 1:
-        client.sent_warning = False
-    if not client.sent_warning and not client.scored_today and hour == 23 and minute == 0:
-        warning = ''
-        for player in client.players:
-            if player.registered and not player.completedToday:
-                user = utils.get(client.users, name=player.name)
-                warning += f'{user.mention} '
-        if warning != '':
-            await client.text_channel.send(f'{warning}, you have one hour left to do (or skip) the Wordle #{client.game_number}!')
-        client.sent_warning = True
+    curTime = datetime.now().astimezone().replace(microsecond=0)
 
-    # midnight logic
-    if client.midnight_called and hour == 0 and minute == 1:
-        client.midnight_called = False
-    if client.midnight_called or hour != 0 or minute != 0:
-        return
-    client.midnight_called = True
+    # Warnings
+    for player in client.players:
+        await player.send_warning(curTime)
 
-    print(f'{get_log_time()}> It is midnight, sending daily scoreboard if unscored and then mentioning registered players')
+    # Update wordle number and required letter to earliest user timezone
+    for player in client.players():
+        if not client.midnight_called and player.past_reset_time():
+            client.midnight_called = True
+            client.game_number += 1
+            if client.random_letter_starting:
+                oldLetter = client.text_channel.name.split('-')[1]
+                client.get_new_letter()
+                await client.text_channel.edit(name=f'letter-{client.letter}-{oldLetter}-wordle')
 
-    # score players
-    if not client.scored_today:
-        shamed = ''
-        for player in client.players:
-            if player.registered and not player.completedToday:
-                user = utils.get(client.users, name=player.name)
-                if user:
-                    shamed += f'{user.mention} '
-                else:
-                    print(f'{get_log_time()}> Failed to mention user {player.name}')
-        if shamed != '':
-            await client.text_channel.send(f'SHAME ON {shamed} FOR NOT DOING WORDLE #{client.game_number}!')
-        await client.text_channel.edit(name='wordle')
-        scoreboard = ''
-        for line in client.tally_scores():
-            scoreboard += line
-        await client.text_channel.send(scoreboard)
-        for player in client.players:
-            if player.registered and player.filePath != '':
-                await client.text_channel.send(content=f'__{player.name}:__\n{player.messageContent}', file=File(player.filePath))
-                try:
-                    os.remove(player.filePath)
-                except OSError as e:
-                    print(f'Error deleting {player.filePath}: {e}')
-                player.filePath = ''
-                player.messageContent = ''
+    # Mention users when it passes midnight for them
+    for player in client.players:
+        if player.past_reset_time():
+            player.shift_data()
+            await player.notify_of_wordle()
 
+    # Midnight/All answered - Ready for scoring?
+    for player in client.players:
+        if not player.past_reset_time(curTime) and not player.completedToday:
+            return
+
+    print(f'{get_log_time()}> Everyone is past midnight or has answered, sending daily scoreboard')
+
+    # Score players
+    shamed = ''
+    for player in client.players:
+        if player.registered and not player.completedToday:
+            user = utils.get(client.users, name=player.name)
+            if user:
+                shamed += f'{user.mention} '
+            else:
+                print(f'{get_log_time()}> Failed to mention user {player.name}')
+    if shamed != '':
+        await client.text_channel.send(f'SHAME ON {shamed} FOR NOT DOING WORDLE #{client.game_number}!')
+    await client.text_channel.edit(name='wordle')
+    scoreboard = ''
+    for line in client.tally_scores():
+        scoreboard += line
+    await client.text_channel.send(scoreboard)
+    for player in client.players:
+        if player.registered and player.filePath != '':
+            await client.text_channel.send(content=f'__{player.name}:__\n{player.messageContent}', file=File(player.filePath))
+            try:
+                os.remove(player.filePath)
+            except OSError as e:
+                print(f'Error deleting {player.filePath}: {e}')
+            player.filePath = ''
+            player.messageContent = ''
+
+    # Reset resetTimes
     client.scored_today = False
     everyone = ''
     for player in client.players:
         player.guesses = 0
         player.completedToday = False
         player.succeededToday = False
+        player.resetTime += timedelta(days=1)
+        player.sentWarning = False
         user = utils.get(client.users, name=player.name)
         if user:
             if player.registered:
                 everyone += f'{user.mention} '
         else:
             print(f'{get_log_time()}> Failed to mention user {player.name}')
-    client.game_number += 1
-    await client.text_channel.send(f'{everyone}\nIt\'s time to do Wordle #{client.game_number}!\nhttps://www.nytimes.com/games/wordle/index.html')
-    if client.random_letter_starting:
-        letter = client.get_letter()
-        await client.text_channel.send(f'__**Your first word must start with the letter "{letter}"**__')
-        await client.text_channel.edit(name=f'letter-{letter}-wordle')
+
     client.write_json_file()
 
 client.run(discord_token)
