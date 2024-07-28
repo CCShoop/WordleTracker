@@ -1,10 +1,9 @@
 '''Written by Cael Shoop.'''
 
 import os
-import random
+import pytz
 import asyncio
 import logging
-import pytz
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from discord import (app_commands, Intents, Client, Message, Guild,
@@ -168,8 +167,8 @@ async def setup_hourly_call():
 
 @client.event
 async def on_ready():
-    await setup_hourly_call()
     logger.info(f"{client.user} has connected to Discord!")
+    await setup_hourly_call()
 
 @client.event
 async def on_message(message: Message):
@@ -256,8 +255,6 @@ async def textchannel_command(interaction: Interaction, use_random_letters: bool
     if tracker is None:
         tracker = Tracker.from_interaction(interaction)
         tracker.usingRandomLetter = use_random_letters
-    else:
-        tracker.textChannel = interaction.channel
     persist.write(client.get_tracker_dict())
     content = f"WordleTracker in this server will now operate in {interaction.channel.mention}."
     await interaction.response.send_message(content=content, ephemeral=True)
