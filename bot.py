@@ -14,6 +14,7 @@ from discord.ext import tasks
 
 from persistence import Persistence
 from player import Player
+from data import TrackerData
 
 # .env
 load_dotenv()
@@ -35,32 +36,45 @@ logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
 # Persistence
-persist = Persistence("data.json")
+persist = Persistence("info.json")
 
 
 class Tracker:
-    def __init__(self, guild: Guild, textChannel: TextChannel, players: list):
+    def __init__(self,
+                 guild: Guild,
+                 textChannel: TextChannel,
+                 players: list,
+                 prevData: TrackerData,
+                 data: TrackerData):
         self.guild = guild
         self.textChannel = textChannel
         if players is not None:
             self.players = players
         else:
             self.players = []
+        self.prevData = prevData
+        self.data = data
 
-    def to_dict() -> dict:
-        data = {}
-        return data
+    def shift_data(self) -> None:
+        self.prevData = self.data
+        self.data.reset()
+        for player in self.players:
+            player.shift_data()
+
+    def to_dict(self) -> dict:
+        payload = {}
+        return payload
 
     @classmethod
-    def from_dict(cls, data: dict):
+    def from_dict(cls, payload: dict):
         try:
-            textChannel = client.get_channel(data["textChannelId"])
+            textChannel = client.get_channel(payload["textChannelId"])
         except:
             textChannel = None
         return cls(
-            guild=data["guild"],
+            guild=payload["guild"],
             textChannel=textChannel,
-            players=[Player.from_dict(playerData) for playerData in data["players"]]
+            players=[Player.from_dict(playerData) for playerData in payload["players"]]
         )
 
 class TimezoneMenu(Select):
@@ -77,7 +91,8 @@ class TimezoneMenu(Select):
 
     async def callback(self, interaction: Interaction):
         content = "Failed to find you in the players list. Are you registered?"
-        for player in client.players:
+        tracker = client.get_tracker_for_channel(interaction.channel)
+        for player in tracker.players:
             if player.name == interaction.user.name:
                 timezone = pytz.timezone(self.values[0])
                 player.resetTime = datetime.now().astimezone(tz=timezone).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
@@ -98,6 +113,7 @@ class WordleTracker(Client):
 
     def __init__(self, intents: Intents) -> None:
         super().__init__(intents=intents)
+        self.tree = app_commands.CommandTree(self)
         self.trackers = []
 
     def get_tracker_for_channel(self, channel: TextChannel) -> Tracker:
