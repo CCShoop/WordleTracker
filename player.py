@@ -1,6 +1,6 @@
 '''Written by Cael Shoop.'''
 
-from discord import Member, Guild
+from discord import Member, Guild, Interaction
 
 from data import PlayerData
 
@@ -23,6 +23,11 @@ class Player:
         payload["prevData"] = self.prevData.to_dict()
         payload["data"] = self.data.to_dict()
         return payload
+
+    @classmethod
+    def from_interaction(cls, interaction: Interaction):
+        # TODO
+        return cls()
 
     @classmethod
     def from_dict(cls, guild: Guild, payload: dict):

@@ -43,11 +43,13 @@ class Tracker:
     def __init__(self,
                  guild: Guild,
                  textChannel: TextChannel,
+                 usingRandomLetter: bool,
                  players: list,
                  prevData: TrackerData,
                  data: TrackerData):
         self.guild = guild
         self.textChannel = textChannel
+        self.usingRandomLetter = usingRandomLetter
         if players is not None:
             self.players = players
         else:
@@ -63,18 +65,36 @@ class Tracker:
 
     def to_dict(self) -> dict:
         payload = {}
+        payload["guildId"] = self.guild.id
+        payload["textChannelId"] = self.textChannel.id
+        payload["usingRandomLetter"] = self.usingRandomLetter
+        payload["players"] = [player.to_dict() for player in self.players]
+        payload["prevData"] = self.prevData.to_dict()
+        payload["data"] = self.data.to_dict()
         return payload
 
     @classmethod
+    def from_interaction(cls, interaction: Interaction):
+        # TODO
+        return cls()
+
+    @classmethod
     def from_dict(cls, payload: dict):
+        try:
+            guild = client.get_guild(payload["guildId"])
+        except:
+            return None
         try:
             textChannel = client.get_channel(payload["textChannelId"])
         except:
             textChannel = None
         return cls(
-            guild=payload["guild"],
+            guild=guild,
             textChannel=textChannel,
-            players=[Player.from_dict(playerData) for playerData in payload["players"]]
+            usingRandomLetter=payload["usingRandomLetter"],
+            players=[Player.from_dict(playerData) for playerData in payload["players"]],
+            prevData=TrackerData.from_dict(payload["prevData"]),
+            data=TrackerData.from_dict(payload["data"])
         )
 
 class TimezoneMenu(Select):
@@ -163,36 +183,84 @@ async def on_message(message: Message):
 async def register_command(interaction: Interaction):
     tracker = client.get_tracker_for_channel(interaction.channel)
     if tracker is None:
+        content = f"WordleTracker is not bound to {interaction.channel.mention}."
+        await interaction.response.send_message(content=content, ephemeral=True)
         return
-    # TODO
+    for player in tracker.players:
+        if player.member.id == interaction.user.id:
+            if player.registered:
+                content = "You are already registered for Wordle tracking."
+            else:
+                player.registered = True
+                content = "You have been re-registered for Wordle tracking."
+            await interaction.response.send_message(content=content, ephemeral=True)
+            return
+    player = Player.from_interaction(interaction)
+    tracker.players.append(player)
+    content = "You have been registered for Wordle tracking."
+    await interaction.response.send_message(content=content, ephemeral=True)
 
 @client.tree.command(name="deregister", description="Deregister from Wordle tracking. Use twice to delete saved data.")
 async def deregister_command(interaction: Interaction):
     tracker = client.get_tracker_for_channel(interaction.channel)
     if tracker is None:
+        content = f"WordleTracker is not bound to {interaction.channel.mention}."
+        await interaction.response.send_message(content=content, ephemeral=True)
         return
-    # TODO
+    culled_players = []
+    content = "You are not registered for Wordle tracking."
+    for player in tracker.players:
+        if player.member.id == interaction.user.id:
+            if player.registered:
+                player.registered = False
+                content = "You have been deregistered from Wordle tracking."
+                culled_players.append(player)
+            else:
+                content = "Your Wordle data has been deleted."
+        else:
+            culled_players.append(player)
+    tracker.players = culled_players
+    await interaction.response.send_message(content=content, ephemeral=True)
 
 @client.tree.command(name="timezone", description="Change your timezone for scoring and notification purposes.")
 async def timezone_command(interaction: Interaction):
     tracker = client.get_tracker_for_channel(interaction.channel)
     if tracker is None:
+        content = f"WordleTracker is not bound to {interaction.channel.mention}."
+        await interaction.response.send_message(content=content, ephemeral=True)
         return
-    # TODO
+    content = 'Select a timezone:'
+    view = TimezoneMenuView()
+    await interaction.response.send_message(content=content, view=view, ephemeral=True)
 
 @client.tree.command(name="randomletterstart", description="State a random letter to start the Wordle guessing with.")
-@app_commands.describe(random_letters="Whether you want forced starting with a random letter.")
-async def randomletterstart_command(interaction: Interaction, random_letters: bool = True):
+@app_commands.describe(use_random_letters="Whether you want forced starting with a random letter.")
+async def randomletterstart_command(interaction: Interaction, use_random_letters: bool = True):
     tracker = client.get_tracker_for_channel(interaction.channel)
     if tracker is None:
+        content = f"WordleTracker is not bound to {interaction.channel.mention}."
+        await interaction.response.send_message(content=content, ephemeral=True)
         return
-    # TODO
+    tracker.usingRandomLetter = use_random_letters
+    if tracker.usingRandomLetter:
+        tracker.data.get_new_letter()
+        content = f"WordleTracker will now provide random letters. The current letter is {tracker.data.letter}."
+    else:
+        content = "WordleTracker will no longer provide random letters."
+    await interaction.response.send_message(content=content)
 
 @client.tree.command(name="textchannel", description="Set the text channel for Wordle Tracker.")
-async def textchannel_command(interaction: Interaction):
-    client.textChannel = interaction.channel
+@app_commands.describe(use_random_letters="Whether you want forced starting with a random letter.")
+async def textchannel_command(interaction: Interaction, use_random_letters: bool = False):
+    tracker = client.get_tracker_for_channel(interaction.channel)
+    if tracker is None:
+        tracker = Tracker.from_interaction(interaction)
+        tracker.usingRandomLetter = use_random_letters
+    else:
+        tracker.textChannel = interaction.channel
+    persist.write(client.get_tracker_dict())
     content = f"WordleTracker in this server will now operate in {interaction.channel.mention}."
-    await interaction.response.send_message(content=content)
+    await interaction.response.send_message(content=content, ephemeral=True)
 
 @tasks.loop(hours=1)
 async def midnight_call():
