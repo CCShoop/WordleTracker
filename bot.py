@@ -74,8 +74,17 @@ class Tracker:
 
     @classmethod
     def from_interaction(cls, interaction: Interaction):
-        # TODO
-        return cls()
+        players = []
+        for member in interaction.channel.members:
+            player = Player.from_member(member)
+            players.append(player)
+        return cls(guild=interaction.guild,
+                   textChannel=interaction.channel,
+                   usingRandomLetter=False,
+                   players=players,
+                   prevData=None,
+                   data=TrackerData()
+                   )
 
     @classmethod
     def from_dict(cls, payload: dict):
@@ -194,7 +203,8 @@ async def register_command(interaction: Interaction):
                 content = "You have been re-registered for Wordle tracking."
             await interaction.response.send_message(content=content, ephemeral=True)
             return
-    player = Player.from_interaction(interaction)
+    member = interaction.guild.get_member(interaction.user.id)
+    player = Player.from_member(member)
     tracker.players.append(player)
     content = "You have been registered for Wordle tracking."
     await interaction.response.send_message(content=content, ephemeral=True)

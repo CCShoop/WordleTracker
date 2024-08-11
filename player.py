@@ -1,6 +1,6 @@
 '''Written by Cael Shoop.'''
 
-from discord import Member, Guild, Interaction
+from discord import Member, Guild
 
 from data import PlayerData
 
@@ -25,9 +25,12 @@ class Player:
         return payload
 
     @classmethod
-    def from_interaction(cls, interaction: Interaction):
-        # TODO
-        return cls()
+    def from_member(cls, member: Member):
+        return cls(member=member,
+                   registered=True,
+                   prevData=None,
+                   data=PlayerData()
+                   )
 
     @classmethod
     def from_dict(cls, guild: Guild, payload: dict):
