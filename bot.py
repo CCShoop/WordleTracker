@@ -144,6 +144,14 @@ class WordleTracker(Client):
         self.tree = app_commands.CommandTree(self)
         self.trackers = []
 
+    def load_data(self, data: dict) -> None:
+        if data is None:
+            logger.info("No json data found")
+            return
+        logger.info("Json data found")
+        for trackerData in data["trackers"]:
+            self.add_tracker(trackerData)
+
     def get_tracker_for_channel(self, channel: TextChannel) -> Tracker:
         for tracker in self.trackers:
             if tracker.textChannel == channel:
@@ -151,16 +159,34 @@ class WordleTracker(Client):
         return None
 
     def add_tracker(self, data: dict) -> None:
-        tracker = Tracker.from_dict(data)
-        self.trackers.append(tracker)
+        try:
+            tracker = Tracker.from_dict(data)
+            self.trackers.append(tracker)
+            logger.info("Added tracker")
+        except Exception as e:
+            logger.exception(f"Failed to load tracker: {e}")
 
     def remove_tracker(self, tracker: Tracker) -> None:
-        self.trackers.remove(tracker)
+        try:
+            self.trackers.remove(tracker)
+            logger.info("Removed tracker")
+        except Exception as e:
+            logger.error(f"Failed to remove tracker: {e}")
+
+    def get_tracker_data(self) -> dict:
+        payload = {}
+        try:
+            payload["trackers"] = [tracker.to_dict() for tracker in self.trackers]
+        except Exception as e:
+            logger.exception(f"Failed to get tracker data: {e}")
+        finally:
+            return payload
 
 
 discord_token = os.getenv("DISCORD_TOKEN")
 client = WordleTracker(intents=Intents.all())
-client.read_json_file()
+data = persist.read()
+client.load_data(data)
 client.get_previous_answers()
 
 
@@ -185,7 +211,7 @@ async def on_message(message: Message):
     tracker = client.get_tracker_for_channel(message.channel)
     if tracker is None:
         return
-    # TODO
+    # TODO parse player messages into scores and screenshots
 
 @client.tree.command(name="register", description="Register for Wordle tracking.")
 async def register_command(interaction: Interaction):
@@ -271,5 +297,5 @@ async def textchannel_command(interaction: Interaction, use_random_letters: bool
 
 @tasks.loop(hours=1)
 async def midnight_call():
-    # TODO
+    # TODO scoring for each timezone
     pass
